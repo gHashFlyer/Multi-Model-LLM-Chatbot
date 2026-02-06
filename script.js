@@ -12,7 +12,9 @@ const GLOBAL_CONFIG = {
     // API Endpoints
     endpoints: {
         anthropic: 'https://api.anthropic.com/v1/messages',
+        anthropicModels: 'https://api.anthropic.com/v1/models',
         openai: 'https://api.openai.com/v1/chat/completions',
+        openaiModels: 'https://api.openai.com/v1/models',
         gemini: 'https://generativelanguage.googleapis.com/v1beta/models'
     },
     
@@ -88,6 +90,42 @@ const PRICING_TABLE = {
 };
 
 // ============================================
+// MODEL CATALOG (fallback + cache)
+// ============================================
+const DEFAULT_MODELS = {
+    anthropic: [
+        { id: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet' },
+        { id: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku' },
+        { id: 'claude-sonnet-4-20250514', label: 'Claude 4 Sonnet' },
+        { id: 'claude-opus-4-20250514', label: 'Claude 4 Opus' }
+    ],
+    openai: [
+        { id: 'gpt-5.2', label: 'GPT-5.2' },
+        { id: 'gpt-5-mini', label: 'GPT-5 Mini' },
+        { id: 'gpt-5-nano', label: 'GPT-5 Nano' },
+        { id: 'gpt-4o', label: 'GPT-4o' },
+        { id: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+        { id: 'o1', label: 'o1' }
+    ],
+    gemini: [
+        { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
+        { id: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
+        { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+        { id: 'gemini-3-flash-preview', label: 'Gemini 3.5 Flash Preview' },
+        { id: 'gemini-3-pro-preview', label: 'Gemini 3.5 Pro Preview' }
+    ]
+};
+
+const PROVIDER_LABELS = {
+    anthropic: 'Anthropic',
+    openai: 'OpenAI',
+    gemini: 'Google Gemini'
+};
+
+const MODEL_CACHE_KEY = 'llm_chatbot_model_catalog';
+const MODEL_CACHE_TTL_MS = 1000 * 60 * 60 * 6;
+
+// ============================================
 // APPLICATION STATE
 // ============================================
 let state = {
@@ -95,19 +133,22 @@ let state = {
     currentConversationId: null,
     currentSystemPromptId: 'none',
     isLoading: false,
-    theme: 'light'
+    theme: 'light',
+    availableModels: null,
+    pendingDeleteId: null
 };
 
 // ============================================
 // INITIALIZATION
 // ============================================
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     loadApiKeysFromStorage();
     loadSystemPromptsFromStorage();
     loadFromLocalStorage();
     renderConversationsList();
     renderSystemPromptSelector();
     initTheme();
+    await initModelSelector();
     
     if (state.conversations.length === 0) {
         createNewConversation();
@@ -125,6 +166,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 closeSystemPromptsModal();
             }
         });
+    }
+
+    const deleteConfirmModal = document.getElementById('deleteConfirmModal');
+    if (deleteConfirmModal) {
+        deleteConfirmModal.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal-overlay')) {
+                closeDeleteConfirmModal();
+            }
+        });
+    }
+
+    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+    if (confirmDeleteBtn) {
+        confirmDeleteBtn.addEventListener('click', confirmDeleteConversation);
     }
 });
 
@@ -148,6 +203,7 @@ function loadFromLocalStorage() {
         state.currentConversationId = parsed.currentConversationId;
         state.currentSystemPromptId = parsed.currentSystemPromptId || 'none';
         state.theme = parsed.theme || 'light';
+        state.conversations.forEach(ensureConversationMetrics);
     }
 }
 
@@ -175,6 +231,9 @@ function createNewConversation() {
         messages: [],
         model: document.getElementById('modelSelect').value,
         totalCost: 0,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+        modelUsage: {},
         createdAt: new Date().toISOString()
     };
     
@@ -199,9 +258,12 @@ function loadConversation(conversationId) {
     }
 }
 
-function deleteConversation(conversationId, event) {
+function requestDeleteConversation(conversationId, event) {
     event.stopPropagation();
-    
+    showDeleteConfirmModal(conversationId);
+}
+
+function deleteConversation(conversationId) {
     state.conversations = state.conversations.filter(c => c.id !== conversationId);
     
     if (state.currentConversationId === conversationId) {
@@ -216,8 +278,46 @@ function deleteConversation(conversationId, event) {
     renderConversationsList();
 }
 
+function showDeleteConfirmModal(conversationId) {
+    state.pendingDeleteId = conversationId;
+    const modal = document.getElementById('deleteConfirmModal');
+    if (modal) {
+        modal.classList.add('active');
+    }
+}
+
+function closeDeleteConfirmModal() {
+    state.pendingDeleteId = null;
+    const modal = document.getElementById('deleteConfirmModal');
+    if (modal) {
+        modal.classList.remove('active');
+    }
+}
+
+function confirmDeleteConversation() {
+    if (!state.pendingDeleteId) return;
+    const conversationId = state.pendingDeleteId;
+    closeDeleteConfirmModal();
+    deleteConversation(conversationId);
+}
+
 function getCurrentConversation() {
     return state.conversations.find(c => c.id === state.currentConversationId);
+}
+
+function ensureConversationMetrics(conversation) {
+    if (typeof conversation.totalCost !== 'number') {
+        conversation.totalCost = 0;
+    }
+    if (typeof conversation.totalInputTokens !== 'number') {
+        conversation.totalInputTokens = 0;
+    }
+    if (typeof conversation.totalOutputTokens !== 'number') {
+        conversation.totalOutputTokens = 0;
+    }
+    if (!conversation.modelUsage || typeof conversation.modelUsage !== 'object') {
+        conversation.modelUsage = {};
+    }
 }
 
 function updateConversationTitle(conversation) {
@@ -293,17 +393,27 @@ function renderConversationsList() {
         return;
     }
     
-    container.innerHTML = state.conversations.map(conv => `
+    container.innerHTML = state.conversations.map(conv => {
+        ensureConversationMetrics(conv);
+        const totalTokens = conv.totalInputTokens + conv.totalOutputTokens;
+        const metaParts = [
+            formatDate(conv.createdAt),
+            getModelDisplayName(conv.model),
+            `${formatTokenCount(totalTokens)} tokens`,
+            `$${conv.totalCost.toFixed(4)}`
+        ];
+        return `
         <div class="conversation-item ${conv.id === state.currentConversationId ? 'active' : ''}" 
              onclick="loadConversation('${conv.id}')">
             <div style="flex: 1; overflow: hidden;">
                 <div class="conversation-title" id="title-${conv.id}">${escapeHtml(conv.title)}</div>
-                <div class="conversation-meta">${formatDate(conv.createdAt)} • ${getModelDisplayName(conv.model)}</div>
+                <div class="conversation-meta">${metaParts.join(' • ')}</div>
             </div>
             <button class="edit-title-btn" onclick="enableTitleEdit('${conv.id}', event)" title="Edit title">✏️</button>
-            <button class="delete-conv-btn" onclick="deleteConversation('${conv.id}', event)" title="Delete">🗑️</button>
+            <button class="delete-conv-btn" onclick="requestDeleteConversation('${conv.id}', event)" title="Delete">🗑️</button>
         </div>
-    `).join('');
+    `;
+    }).join('');
 }
 
 function renderMessages() {
@@ -452,6 +562,12 @@ function updateCostDisplay() {
     document.getElementById('costDisplay').textContent = `$${cost.toFixed(4)}`;
 }
 
+function formatTokenCount(count) {
+    if (count >= 1000000) return `${(count / 1000000).toFixed(2)}M`;
+    if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
+    return `${count}`;
+}
+
 // ============================================
 // UTILITY FUNCTIONS
 // ============================================
@@ -475,6 +591,9 @@ function formatDate(dateString) {
 }
 
 function getModelDisplayName(modelId) {
+    const catalogLabel = findCatalogLabel(modelId);
+    if (catalogLabel) return catalogLabel;
+
     const names = {
         'claude-3-5-sonnet-20241022': 'Claude 3.5 Sonnet',
         'claude-3-5-haiku-20241022': 'Claude 3.5 Haiku',
@@ -492,12 +611,26 @@ function getModelDisplayName(modelId) {
         'gemini-3-flash-preview': 'Gemini 3.5 Flash Preview',
         'gemini-3-pro-preview': 'Gemini 3.5 Pro Preview'
     };
-    return names[modelId] || modelId;
+    if (names[modelId]) return names[modelId];
+    return modelId
+        .replace(/models\//g, '')
+        .replace(/[-_]/g, ' ')
+        .replace(/\b\w/g, char => char.toUpperCase());
+}
+
+function findCatalogLabel(modelId) {
+    if (!state.availableModels) return null;
+    const providers = Object.values(state.availableModels);
+    for (const models of providers) {
+        const match = (models || []).find(model => model.id === modelId);
+        if (match?.label) return match.label;
+    }
+    return null;
 }
 
 function getProvider(modelId) {
     if (modelId.startsWith('claude')) return 'anthropic';
-    if (modelId.startsWith('gpt') || modelId === 'o1') return 'openai';
+    if (modelId.startsWith('gpt') || /^o\d/.test(modelId)) return 'openai';
     if (modelId.startsWith('gemini')) return 'gemini';
     return null;
 }
@@ -541,6 +674,211 @@ function renderSystemPromptSelector() {
     select.innerHTML = systemPrompts.map(prompt => 
         `<option value="${prompt.id}" ${prompt.id === state.currentSystemPromptId ? 'selected' : ''}>${prompt.title}</option>`
     ).join('');
+}
+
+// ============================================
+// MODEL SELECTOR FUNCTIONS
+// ============================================
+async function initModelSelector() {
+    const select = document.getElementById('modelSelect');
+    if (!select) return;
+
+    const currentModel = getCurrentConversation()?.model || null;
+    const cachedCatalog = getCachedModelCatalog();
+
+    if (cachedCatalog) {
+        state.availableModels = cachedCatalog;
+        renderModelSelector(cachedCatalog, currentModel);
+    }
+
+    const catalog = await fetchAvailableModels();
+    if (catalog) {
+        state.availableModels = catalog;
+        setCachedModelCatalog(catalog);
+        renderModelSelector(catalog, currentModel);
+    } else if (!cachedCatalog) {
+        state.availableModels = DEFAULT_MODELS;
+        renderModelSelector(DEFAULT_MODELS, currentModel);
+    }
+}
+
+function getCachedModelCatalog() {
+    const raw = localStorage.getItem(MODEL_CACHE_KEY);
+    if (!raw) return null;
+
+    try {
+        const parsed = JSON.parse(raw);
+        if (!parsed?.timestamp || !parsed?.catalog) return null;
+        if (Date.now() - parsed.timestamp > MODEL_CACHE_TTL_MS) return null;
+        return parsed.catalog;
+    } catch (error) {
+        console.warn('Failed to parse cached model catalog:', error);
+        return null;
+    }
+}
+
+function setCachedModelCatalog(catalog) {
+    localStorage.setItem(MODEL_CACHE_KEY, JSON.stringify({
+        timestamp: Date.now(),
+        catalog
+    }));
+}
+
+function renderModelSelector(catalog, selectedModelId) {
+    const select = document.getElementById('modelSelect');
+    if (!select) return;
+
+    const normalized = normalizeModelCatalog(catalog);
+    const providerOrder = ['anthropic', 'openai', 'gemini'];
+    let optionsHtml = '';
+
+    providerOrder.forEach(provider => {
+        const models = normalized[provider] || [];
+        if (!models.length) return;
+
+        optionsHtml += `<optgroup label="${PROVIDER_LABELS[provider]}">`;
+        optionsHtml += models.map(model => {
+            const label = escapeHtml(model.label || getModelDisplayName(model.id));
+            return `<option value="${model.id}">${label}</option>`;
+        }).join('');
+        optionsHtml += '</optgroup>';
+    });
+
+    if (!optionsHtml) {
+        optionsHtml = '<option value="" disabled>Models unavailable</option>';
+    }
+
+    select.innerHTML = optionsHtml;
+
+    if (selectedModelId) {
+        select.value = selectedModelId;
+    }
+
+    if (!select.value && select.options.length > 0) {
+        select.value = select.options[0].value;
+    }
+
+    const conversation = getCurrentConversation();
+    if (conversation && conversation.model !== select.value) {
+        conversation.model = select.value;
+        saveToLocalStorage();
+    }
+}
+
+function normalizeModelCatalog(catalog) {
+    const normalized = {
+        anthropic: [],
+        openai: [],
+        gemini: []
+    };
+
+    Object.keys(normalized).forEach(provider => {
+        const models = catalog?.[provider] || [];
+        normalized[provider] = models.map(model => {
+            if (typeof model === 'string') {
+                return { id: model, label: getModelDisplayName(model) };
+            }
+            return { id: model.id, label: model.label || getModelDisplayName(model.id) };
+        });
+    });
+
+    return normalized;
+}
+
+async function fetchAvailableModels() {
+    const catalog = {
+        anthropic: [],
+        openai: [],
+        gemini: []
+    };
+
+    const hasAnthropicKey = GLOBAL_CONFIG.apiKeys.anthropic && GLOBAL_CONFIG.apiKeys.anthropic !== 'YOUR_ANTHROPIC_API_KEY';
+    const hasOpenAIKey = GLOBAL_CONFIG.apiKeys.openai && GLOBAL_CONFIG.apiKeys.openai !== 'YOUR_OPENAI_API_KEY';
+    const hasGeminiKey = GLOBAL_CONFIG.apiKeys.gemini && GLOBAL_CONFIG.apiKeys.gemini !== 'YOUR_GEMINI_API_KEY';
+
+    try {
+        if (hasAnthropicKey) {
+            const response = await fetch(GLOBAL_CONFIG.endpoints.anthropicModels, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': GLOBAL_CONFIG.apiKeys.anthropic,
+                    'anthropic-version': '2023-06-01'
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                catalog.anthropic = (data.data || [])
+                    .filter(model => model.id?.startsWith('claude'))
+                    .map(model => ({
+                        id: model.id,
+                        label: model.display_name || model.id
+                    }));
+            }
+        }
+    } catch (error) {
+        console.warn('Anthropic models fetch failed:', error);
+    }
+
+    try {
+        if (hasOpenAIKey) {
+            const response = await fetch(GLOBAL_CONFIG.endpoints.openaiModels, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${GLOBAL_CONFIG.apiKeys.openai}`
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const allowed = /^(gpt-|o\d)/;
+                catalog.openai = (data.data || [])
+                    .map(model => model.id)
+                    .filter(id => allowed.test(id))
+                    .map(id => ({ id, label: getModelDisplayName(id) }));
+            }
+        }
+    } catch (error) {
+        console.warn('OpenAI models fetch failed:', error);
+    }
+
+    try {
+        if (hasGeminiKey) {
+            const response = await fetch(`${GLOBAL_CONFIG.endpoints.gemini}?key=${GLOBAL_CONFIG.apiKeys.gemini}`);
+            if (response.ok) {
+                const data = await response.json();
+                catalog.gemini = (data.models || [])
+                    .filter(model => (model.supportedGenerationMethods || []).includes('generateContent'))
+                    .map(model => {
+                        const id = model.name?.replace('models/', '');
+                        return {
+                            id,
+                            label: model.displayName || id
+                        };
+                    })
+                    .filter(model => model.id && model.id.startsWith('gemini'));
+            }
+        }
+    } catch (error) {
+        console.warn('Gemini models fetch failed:', error);
+    }
+
+    const hasAny = Object.values(catalog).some(list => list.length > 0);
+    if (!hasAny) {
+        return null;
+    }
+
+    return mergeCatalogWithDefaults(catalog);
+}
+
+function mergeCatalogWithDefaults(catalog) {
+    const merged = { ...catalog };
+    Object.keys(DEFAULT_MODELS).forEach(provider => {
+        if (!merged[provider] || merged[provider].length === 0) {
+            merged[provider] = DEFAULT_MODELS[provider];
+        }
+    });
+    return merged;
 }
 
 function handleSystemPromptChange() {
@@ -709,11 +1047,26 @@ async function sendMessage() {
         }
         
         const cost = calculateCost(inputTokens, outputTokens, conversation.model);
+        const modelId = conversation.model;
+        ensureConversationMetrics(conversation);
         conversation.totalCost += cost;
+        conversation.totalInputTokens += inputTokens;
+        conversation.totalOutputTokens += outputTokens;
+        if (!conversation.modelUsage[modelId]) {
+            conversation.modelUsage[modelId] = {
+                inputTokens: 0,
+                outputTokens: 0,
+                totalTokens: 0
+            };
+        }
+        conversation.modelUsage[modelId].inputTokens += inputTokens;
+        conversation.modelUsage[modelId].outputTokens += outputTokens;
+        conversation.modelUsage[modelId].totalTokens += inputTokens + outputTokens;
         
         saveToLocalStorage();
         renderMessages();
         updateCostDisplay();
+        renderConversationsList();
         
     } catch (error) {
         console.error('API Error:', error);

@@ -199,6 +199,22 @@ html, body {
     opacity: 1;
 }
 
+.btn-danger {
+    padding: 10px 16px;
+    background-color: var(--danger-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: background-color 0.2s;
+}
+
+.btn-danger:hover {
+    background-color: var(--danger-hover);
+}
+
 .delete-conv-btn:hover {
     color: var(--danger-color);
     background-color: var(--bg-sidebar);
