@@ -11,3 +11,6 @@
 For example: (1) run a tiny localhost proxy; (2) keep keys in .env; (3) serve the static frontend locally; (4) bind proxy to 127.0.0.1 only.
 ### -Add support for more models
 ### -Add support for more features
+
+# 🌐 Download Updates from GitHub
+### https://github.com/gHashFlyer/Multi-Model-LLM-Chatbot
