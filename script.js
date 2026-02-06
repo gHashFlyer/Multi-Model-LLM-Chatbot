@@ -104,8 +104,7 @@ const DEFAULT_MODELS = {
         { id: 'gpt-5-mini', label: 'GPT-5 Mini' },
         { id: 'gpt-5-nano', label: 'GPT-5 Nano' },
         { id: 'gpt-4o', label: 'GPT-4o' },
-        { id: 'gpt-4o-mini', label: 'GPT-4o Mini' },
-        { id: 'o1', label: 'o1' }
+        { id: 'gpt-4o-mini', label: 'GPT-4o Mini' }
     ],
     gemini: [
         { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
@@ -115,6 +114,18 @@ const DEFAULT_MODELS = {
         { id: 'gemini-3-pro-preview', label: 'Gemini 3.5 Pro Preview' }
     ]
 };
+
+const OPENAI_CHAT_COMPLETIONS_PREFIXES = [
+    'gpt-5.2',
+    'gpt-5-mini',
+    'gpt-5-nano',
+    'gpt-4o',
+    'gpt-4o-mini',
+    'gpt-4-turbo',
+    'gpt-4',
+    'gpt-3.5-turbo'
+];
+const TEXT_ONLY_MODEL_EXCLUDE = /-(realtime|audio|vision|image|embedding|transcribe|tts|speech|search|computer|cu)/i;
 
 const PROVIDER_LABELS = {
     anthropic: 'Anthropic',
@@ -774,15 +785,37 @@ function normalizeModelCatalog(catalog) {
 
     Object.keys(normalized).forEach(provider => {
         const models = catalog?.[provider] || [];
-        normalized[provider] = models.map(model => {
-            if (typeof model === 'string') {
-                return { id: model, label: getModelDisplayName(model) };
-            }
-            return { id: model.id, label: model.label || getModelDisplayName(model.id) };
-        });
+        normalized[provider] = models
+            .map(model => {
+                if (typeof model === 'string') {
+                    return { id: model, label: getModelDisplayName(model) };
+                }
+                return { id: model.id, label: model.label || getModelDisplayName(model.id) };
+            })
+            .filter(model => isChatModelForProvider(provider, model.id));
     });
 
     return normalized;
+}
+
+function isChatModelForProvider(provider, modelId) {
+    if (!modelId) return false;
+    switch (provider) {
+        case 'anthropic':
+            return modelId.startsWith('claude') && !TEXT_ONLY_MODEL_EXCLUDE.test(modelId);
+        case 'openai':
+            return isOpenAIChatCompletionsModel(modelId);
+        case 'gemini':
+            return modelId.startsWith('gemini') && !TEXT_ONLY_MODEL_EXCLUDE.test(modelId);
+        default:
+            return false;
+    }
+}
+
+function isOpenAIChatCompletionsModel(modelId) {
+    if (!modelId || !modelId.startsWith('gpt-')) return false;
+    if (TEXT_ONLY_MODEL_EXCLUDE.test(modelId)) return false;
+    return OPENAI_CHAT_COMPLETIONS_PREFIXES.some(prefix => modelId.startsWith(prefix));
 }
 
 async function fetchAvailableModels() {
@@ -831,10 +864,9 @@ async function fetchAvailableModels() {
 
             if (response.ok) {
                 const data = await response.json();
-                const allowed = /^(gpt-|o\d)/;
                 catalog.openai = (data.data || [])
                     .map(model => model.id)
-                    .filter(id => allowed.test(id))
+                    .filter(id => isOpenAIChatCompletionsModel(id))
                     .map(id => ({ id, label: getModelDisplayName(id) }));
             }
         }
