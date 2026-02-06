@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920">
+    <title>Multi-Model LLM Chatbot</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>||||||||||||||||||||||||||||||||||||||||||||||||||</h1>
+                <button class="new-chat-btn" onclick="createNewConversation()">+ New Chat</button>
+            </div>
+            <div class="conversations-list" id="conversationsList">
+                <!-- Conversations will be dynamically inserted here -->
+            </div>
+            <div class="sidebar-footer">
+                <button class="settings-btn" onclick="showApiKeysModal()">
+                    🔑 API Keys Settings
+                </button>
+                <div class="theme-toggle" onclick="toggleTheme()">
+                    <div class="toggle-switch"></div>
+                    <span class="theme-toggle-label">Dark Mode</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="chat-area">
+            <header class="chat-header">
+                <div class="model-selector">
+                    <label for="modelSelect">Model:</label>
+                    <select id="modelSelect" onchange="handleModelChange()">
+                        <optgroup label="Anthropic">
+                            <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+                            <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
+                            <option value="claude-sonnet-4-20250514">Claude 4 Sonnet</option>
+                            <option value="claude-opus-4-20250514">Claude 4 Opus</option>
+                        </optgroup>
+                        <optgroup label="OpenAI">
+                            <option value="gpt-5.2">GPT-5.2</option>
+                            <option value="gpt-5-mini">GPT-5 Mini</option>
+                            <option value="gpt-5-nano">GPT-5 Nano</option>
+
+                        </optgroup>
+                        <optgroup label="Google Gemini">
+                            <option value="gemini-3-flash-preview">Gemini 3.5 Flash Preview</option>
+                            <option value="gemini-3-pro-preview">Gemini 3.5 Pro Preview</option>
+                        </optgroup>
+                    </select>
+                </div>
+                <div class="system-prompt-selector">
+                    <label for="systemPromptSelect">System Prompt:</label>
+                    <select id="systemPromptSelect" onchange="handleSystemPromptChange()">
+                        <!-- Options will be dynamically populated -->
+                    </select>
+                    <button class="edit-prompts-btn" onclick="showSystemPromptsModal()">✏️ Edit</button>
+                </div>
+                <div class="cost-display">
+                    <span class="cost-label">Session Cost:</span>
+                    <span class="cost-value" id="costDisplay">$0.0000</span>
+                </div>
+                <button class="tech-note-btn" onclick="showTechNotesModal()">⚙️ Technical Notes</button>
+            </header>
+
+            <div class="messages-container" id="messagesContainer">
+                <!-- Messages will be rendered dynamically -->
+            </div>
+
+            <div class="input-area">
+                <div class="input-wrapper">
+                    <textarea 
+                        class="message-input" 
+                        id="messageInput" 
+                        placeholder="Type your message here... (Press Enter for new line)"
+                        rows="1"
+                        onkeydown="handleKeyDown(event)"
+                        oninput="autoResizeTextarea(this)"
+                    ></textarea>
+                    <button type="button" class="send-btn" id="sendBtn" onclick="sendMessage()">Send</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Technical Notes Modal -->
+    <div class="modal-overlay" id="techNotesModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Technical Notes</h2>
+                <button class="modal-close" onclick="closeTechNotesModal()">&times;</button>
+            </div>
+            <div class="modal-content">
+                <!-- Content loaded dynamically from technical-notes.md -->
+                <p style="color: var(--text-muted);">Loading technical notes...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Prompts Modal -->
+    <div class="modal-overlay" id="systemPromptsModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>✏️ Edit System Prompts</h2>
+                <button class="modal-close" onclick="closeSystemPromptsModal()">&times;</button>
+            </div>
+            <div class="modal-content">
+                <p style="margin-bottom: 25px; color: var(--text-muted);">
+                    Customize your system prompts below. System prompts guide the AI's behavior and persona.
+                </p>
+                
+                <div id="systemPromptsContainer">
+                    <!-- System prompt inputs will be dynamically inserted here -->
+                </div>
+                
+                <button class="btn-save" onclick="addNewSystemPrompt()" style="margin-top: 15px; width: 100%;">+ Add New Prompt</button>
+                
+                <div class="form-actions">
+                    <button class="btn-cancel" onclick="closeSystemPromptsModal()">Cancel</button>
+                    <button class="btn-save" onclick="saveSystemPrompts()">Save Prompts</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- API Keys Settings Modal -->
+    <div class="modal-overlay" id="apiKeysModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>🔑 API Keys Settings</h2>
+                <button class="modal-close" onclick="closeApiKeysModal()">&times;</button>
+            </div>
+            <div class="modal-content">
+                <p style="margin-bottom: 25px; color: var(--text-muted);">
+                    Enter your API keys below. Keys are stored locally in your browser and never sent to any server except the respective API providers.
+                </p>
+                
+                <div class="form-group">
+                    <label>
+                        Anthropic API Key
+                        <span class="api-key-status" id="anthropicStatus"></span>
+                    </label>
+                    <input
+                        type="password"
+                        id="anthropicKeyInput"
+                        placeholder="sk-ant-api03-..."
+                        autocomplete="off"
+                    >
+                    <p class="hint">Get your key from <a href="https://console.anthropic.com/" target="_blank" style="color: var(--accent-color);">console.anthropic.com</a></p>
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        OpenAI API Key
+                        <span class="api-key-status" id="openaiStatus"></span>
+                    </label>
+                    <input
+                        type="password"
+                        id="openaiKeyInput"
+                        placeholder="sk-..."
+                        autocomplete="off"
+                    >
+                    <p class="hint">Get your key from <a href="https://platform.openai.com/api-keys" target="_blank" style="color: var(--accent-color);">platform.openai.com</a></p>
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        Gemini API Key
+                        <span class="api-key-status" id="geminiStatus"></span>
+                    </label>
+                    <input
+                        type="password"
+                        id="geminiKeyInput"
+                        placeholder="AIza..."
+                        autocomplete="off"
+                    >
+                    <p class="hint">Get your key from <a href="https://aistudio.google.com/apikey" target="_blank" style="color: var(--accent-color);">aistudio.google.com</a></p>
+                </div>
+                
+                <div class="form-actions">
+                    <button class="btn-cancel" onclick="closeApiKeysModal()">Cancel</button>
+                    <button class="btn-save" onclick="saveApiKeys()">Save Keys</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Toast -->
+    <div class="success-toast" id="successToast">API keys saved successfully!</div>
+
+    <script src="script.js"></script>
+</body>
+</html>
