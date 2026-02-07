@@ -506,6 +506,9 @@ function formatMessageContent(content) {
     // Escape HTML first
     let formatted = escapeHtml(content);
     
+    // Format markdown tables
+    formatted = formatMarkdownTables(formatted);
+    
     // Format code blocks with syntax highlighting
     formatted = formatted.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
         const language = lang || 'text';
@@ -570,6 +573,100 @@ function highlightSyntax(code, language) {
         '<span class="syntax-function">$1</span>(');
     
     return highlighted;
+}
+
+/**
+ * Format markdown tables to HTML
+ * @param {string} text - Text containing markdown tables
+ * @returns {string} HTML formatted text with tables
+ */
+function formatMarkdownTables(text) {
+    // Regex to match markdown tables (with or without alignment row)
+    const tableRegex = /(\|[^\n]+\|[\r\n]+\|[\s\-:|]+\|[\r\n]+(?:\|[^\n]+\|[\r\n]+)*)/g;
+    
+    return text.replace(tableRegex, (match) => {
+        const lines = match.trim().split(/[\r\n]+/);
+        if (lines.length < 2) return match;
+        
+        // First line is headers
+        const headerLine = lines[0];
+        const headers = headerLine.split('|')
+            .map(h => h.trim())
+            .filter(h => h.length > 0);
+        
+        // Second line is separator (can contain alignment info)
+        // Skip it for rendering but could parse alignment here if needed
+        
+        // Remaining lines are data rows
+        const dataRows = lines.slice(2).map(line => {
+            return line.split('|')
+                .map(cell => cell.trim())
+                .filter((cell, index) => index > 0 && index <= headers.length);
+        });
+        
+        // Build HTML table
+        let html = '<div class="markdown-table-wrapper">';
+        html += '<table class="markdown-table">';
+        
+        // Table header
+        html += '<thead><tr>';
+        headers.forEach(header => {
+            html += `<th>${header}</th>`;
+        });
+        html += '</tr></thead>';
+        
+        // Table body
+        html += '<tbody>';
+        dataRows.forEach(row => {
+            html += '<tr>';
+            row.forEach(cell => {
+                html += `<td>${cell}</td>`;
+            });
+            html += '</tr>';
+        });
+        html += '</tbody>';
+        
+        html += '</table>';
+        html += '</div>';
+        
+        return html;
+    });
+}
+
+/**
+ * Parse markdown table to array of objects
+ * @param {string} tableText - Markdown table text
+ * @returns {Array|null} Array of objects or null
+ */
+function parseMarkdownTable(tableText) {
+    const lines = tableText.trim().split(/[\r\n]+/);
+    if (lines.length < 3) return null;
+    
+    // First line is headers
+    const headers = lines[0].split('|')
+        .map(h => h.trim())
+        .filter(h => h.length > 0);
+    
+    if (headers.length === 0) return null;
+    
+    // Skip separator line (line 1)
+    // Parse data rows (lines 2+)
+    const dataRows = [];
+    for (let i = 2; i < lines.length; i++) {
+        const cells = lines[i].split('|')
+            .map(c => c.trim())
+            .filter((c, index) => index > 0 && index <= headers.length);
+        
+        if (cells.length > 0) {
+            const row = {};
+            headers.forEach((header, index) => {
+                row[header] = cells[index] || '';
+            });
+            dataRows.push(row);
+        }
+    }
+    
+    return dataRows.length > 0 ? dataRows : null;
 }
 
 function copyCode(blockId) {
@@ -901,17 +998,29 @@ function generateDownloadLinks(data, baseFilename = 'data') {
 
 /**
  * Extract structured data from LLM response text
- * Attempts to find JSON arrays or table-like data
+ * Attempts to find JSON arrays or markdown tables
  * @param {string} text - Response text to parse
  * @returns {Array|null} Extracted data array or null
  */
 function extractDataFromResponse(text) {
-    // Try to find JSON arrays in the text
-    const jsonArrayRegex = /\[\s*\{[\s\S]*?\}\s*\]/g;
-    const matches = text.match(jsonArrayRegex);
+    // First, try to find markdown tables
+    const tableRegex = /(\|[^\n]+\|[\r\n]+\|[\s\-:|]+\|[\r\n]+(?:\|[^\n]+\|[\r\n]+)+)/g;
+    const tableMatches = text.match(tableRegex);
     
-    if (matches) {
-        for (const match of matches) {
+    if (tableMatches && tableMatches.length > 0) {
+        // Parse the first table found
+        const parsedTable = parseMarkdownTable(tableMatches[0]);
+        if (parsedTable && parsedTable.length > 0) {
+            return parsedTable;
+        }
+    }
+    
+    // If no markdown table found, try to find JSON arrays
+    const jsonArrayRegex = /\[\s*\{[\s\S]*?\}\s*\]/g;
+    const jsonMatches = text.match(jsonArrayRegex);
+    
+    if (jsonMatches) {
+        for (const match of jsonMatches) {
             try {
                 const data = JSON.parse(match);
                 if (Array.isArray(data) && data.length > 0 && typeof data[0] === 'object') {

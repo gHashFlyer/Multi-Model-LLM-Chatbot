@@ -1,28 +1,70 @@
-# CSV/Excel Download Feature
+# CSV/Excel Download Feature with Markdown Table Support
 
 ## Overview
 
-This feature automatically detects when the LLM provides structured data and offers downloadable CSV and Excel files. When the chatbot mentions data conversion or provides JSON data, download links are automatically generated.
+This feature automatically detects when the LLM provides structured data (JSON or Markdown tables) and offers downloadable CSV and Excel files. When the chatbot provides tables or data, they are automatically formatted and download links are generated.
 
 ## Features
 
-✅ **Automatic Detection**: Detects when LLM responses contain structured data  
-✅ **CSV Export**: Converts JSON data to CSV format  
-✅ **Excel Export**: Converts JSON data to Excel (.xlsx) format using SheetJS  
-✅ **User-Friendly**: Clean, styled download buttons appear inline with the response  
-✅ **Smart Formatting**: Properly handles special characters, commas, and quotes in CSV  
-✅ **Timestamped Files**: Each download has a unique timestamp to prevent overwrites  
+✅ **Automatic Detection**: Detects when LLM responses contain structured data (JSON or Markdown tables)
+✅ **Markdown Table Rendering**: Beautifully formatted HTML tables from markdown syntax
+✅ **CSV Export**: Converts structured data to CSV format
+✅ **Excel Export**: Converts structured data to Excel (.xlsx) format using SheetJS
+✅ **User-Friendly**: Clean, styled download buttons appear inline with the response
+✅ **Smart Formatting**: Properly handles special characters, commas, and quotes in CSV
+✅ **Timestamped Files**: Each download has a unique timestamp to prevent overwrites
+✅ **Multiple Formats**: Supports both JSON arrays and Markdown table syntax
 
 ## How It Works
 
 ### 1. Data Detection
 
 The system automatically detects structured data by:
-- Looking for JSON arrays in the LLM response
-- Checking for keywords like "csv", "excel", "spreadsheet", "download", "export", "table"
-- Parsing valid JSON data structures
+- **Markdown Tables**: Looking for markdown table syntax (`| Header | Header |`)
+- **JSON Arrays**: Looking for JSON arrays in the LLM response
+- **Keywords**: Checking for keywords like "csv", "excel", "spreadsheet", "download", "export", "table"
+- **Smart Parsing**: Prioritizes markdown tables, then falls back to JSON arrays
 
-### 2. Conversion Functions
+### 2. Markdown Table Functions
+
+#### `formatMarkdownTables(text)`
+```javascript
+function formatMarkdownTables(text) {
+    // Regex to match markdown tables
+    const tableRegex = /(\|[^\n]+\|[\r\n]+\|[\s\-:|]+\|[\r\n]+(?:\|[^\n]+\|[\r\n]+)*)/g;
+    
+    return text.replace(tableRegex, (match) => {
+        // Parse headers and data rows
+        // Generate styled HTML table
+        return html;
+    });
+}
+```
+
+**Features:**
+- Detects markdown table syntax
+- Converts to styled HTML tables
+- Preserves data structure
+- Applies responsive design
+
+#### `parseMarkdownTable(tableText)`
+```javascript
+function parseMarkdownTable(tableText) {
+    const lines = tableText.trim().split(/[\r\n]+/);
+    // Extract headers from first line
+    // Parse data rows (skip separator line)
+    // Return array of objects
+    return dataRows;
+}
+```
+
+**Features:**
+- Parses markdown table into structured data
+- Creates array of objects with headers as keys
+- Skips alignment separator row
+- Returns null if invalid format
+
+### 3. Conversion Functions
 
 #### `convertToCSV(data)`
 ```javascript
@@ -124,7 +166,25 @@ When the LLM provides data that can be exported:
 - "Export this data as CSV"
 - "Give me an Excel spreadsheet of employees"
 - "Generate a table with the following columns..."
+- "Show me a markdown table of the top 10 companies"
+- "Create a comparison table between products"
 - Any response containing a valid JSON array with objects
+- Any response containing a markdown table
+
+### Example Markdown Table Format
+
+```markdown
+| Product | Price | Stock |
+|---------|-------|-------|
+| Laptop  | $999  | 50    |
+| Mouse   | $29   | 200   |
+| Monitor | $299  | 75    |
+```
+
+This will be automatically:
+1. ✨ Rendered as a styled HTML table
+2. 📊 Parsed into structured data
+3. 💾 Made available for CSV/Excel download
 
 ### For Developers
 
@@ -203,13 +263,26 @@ Added styles:
 
 ## Testing
 
-A standalone test file is provided: [`test-download.html`](test-download.html:1)
+Two standalone test files are provided:
 
-To test:
+### 1. [`test-download.html`](test-download.html:1) - JSON Data Testing
+To test JSON data conversion:
 1. Open `test-download.html` in a browser
 2. Click "Generate Download Links"
 3. Test downloading CSV and Excel files
 4. Verify data integrity in the downloaded files
+
+### 2. [`test-markdown-table.html`](test-markdown-table.html:1) - Markdown Table Testing
+To test markdown table rendering and conversion:
+1. Open `test-markdown-table.html` in a browser
+2. Review multiple test cases with different table structures
+3. Click "Render Table & Generate Downloads" for each test
+4. Verify:
+   - Tables render correctly with proper styling
+   - Data is extracted accurately
+   - CSV and Excel downloads contain correct data
+   - Multiple formats (Product, Employee, Sales data) work
+   - JSON array format also works
 
 ## Browser Compatibility
 

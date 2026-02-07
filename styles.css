@@ -942,6 +942,72 @@ html, body {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+/* ============================================
+   MARKDOWN TABLE STYLES
+   ============================================ */
+.markdown-table-wrapper {
+    overflow-x: auto;
+    margin: 15px 0;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-secondary);
+}
+
+.markdown-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    text-align: left;
+}
+
+.markdown-table thead {
+    background-color: var(--accent-color);
+    color: white;
+}
+
+.markdown-table thead th {
+    padding: 12px 15px;
+    font-weight: 600;
+    text-align: left;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.markdown-table tbody tr {
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.2s ease;
+}
+
+.markdown-table tbody tr:hover {
+    background-color: var(--bg-sidebar);
+}
+
+.markdown-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.markdown-table tbody td {
+    padding: 10px 15px;
+    color: var(--text-primary);
+}
+
+/* Alternate row colors for better readability */
+.markdown-table tbody tr:nth-child(even) {
+    background-color: var(--bg-input);
+}
+
+.markdown-table tbody tr:nth-child(even):hover {
+    background-color: var(--bg-sidebar);
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .markdown-table thead {
+    background-color: var(--accent-color);
+}
+
+[data-theme="dark"] .markdown-table tbody tr:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.02);
+}
+
 .api-key-status.missing {
     background-color: rgba(220, 53, 69, 0.15);
     color: var(--danger-color);

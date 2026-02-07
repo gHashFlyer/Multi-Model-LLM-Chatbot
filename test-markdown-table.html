@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown Table Test</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            background-color: var(--bg-secondary);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        .test-section h2 {
+            margin-bottom: 15px;
+            color: var(--accent-color);
+        }
+        .test-section h3 {
+            margin: 20px 0 10px 0;
+            color: var(--text-secondary);
+        }
+        .raw-markdown {
+            background-color: var(--code-bg);
+            color: var(--code-text);
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            font-size: 13px;
+        }
+        .test-button {
+            padding: 10px 20px;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            margin: 10px 5px 10px 0;
+            transition: background-color 0.2s;
+        }
+        .test-button:hover {
+            background-color: var(--accent-hover);
+        }
+        .output-area {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: var(--bg-primary);
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+    </style>
+</head>
+<body>
+    <h1>Markdown Table with CSV/Excel Download Test</h1>
+    <p>This page demonstrates the markdown table rendering and CSV/Excel download functionality.</p>
+
+    <div class="test-section">
+        <h2>Test 1: Simple Product Table</h2>
+        
+        <h3>Raw Markdown Input:</h3>
+        <div class="raw-markdown">| Product | Price | Stock | Category |
+|---------|-------|-------|----------|
+| Laptop | $999 | 50 | Electronics |
+| Mouse | $29 | 200 | Accessories |
+| Keyboard | $79 | 150 | Accessories |
+| Monitor | $299 | 75 | Electronics |</div>
+        
+        <button class="test-button" onclick="testTable1()">Render Table & Generate Downloads</button>
+        <div id="output1" class="output-area"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 2: Employee Data Table</h2>
+        
+        <h3>Raw Markdown Input:</h3>
+        <div class="raw-markdown">| Name | Position | Department | Salary |
+|------|----------|------------|--------|
+| John Smith | Manager | Sales | $85,000 |
+| Jane Doe | Developer | Engineering | $95,000 |
+| Bob Johnson | Designer | Marketing | $70,000 |
+| Alice Williams | Analyst | Finance | $75,000 |
+| Charlie Brown | Director | Operations | $110,000 |</div>
+        
+        <button class="test-button" onclick="testTable2()">Render Table & Generate Downloads</button>
+        <div id="output2" class="output-area"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 3: Sales Data Table</h2>
+        
+        <h3>Raw Markdown Input:</h3>
+        <div class="raw-markdown">| Quarter | Revenue | Profit | Growth % |
+|---------|---------|--------|----------|
+| Q1 2024 | $2.5M | $450K | 12.3% |
+| Q2 2024 | $2.8M | $520K | 15.6% |
+| Q3 2024 | $3.1M | $580K | 18.2% |
+| Q4 2024 | $3.4M | $650K | 21.5% |</div>
+        
+        <button class="test-button" onclick="testTable3()">Render Table & Generate Downloads</button>
+        <div id="output3" class="output-area"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 4: JSON Array Format</h2>
+        
+        <h3>JSON Input:</h3>
+        <div class="raw-markdown">[
+  {"Company": "Apple", "Market Cap": "$3.0T", "Industry": "Technology"},
+  {"Company": "Microsoft", "Market Cap": "$2.8T", "Industry": "Technology"},
+  {"Company": "Google", "Market Cap": "$1.7T", "Industry": "Technology"},
+  {"Company": "Amazon", "Market Cap": "$1.5T", "Industry": "E-commerce"}
+]</div>
+        
+        <button class="test-button" onclick="testJSON()">Generate Downloads from JSON</button>
+        <div id="output4" class="output-area"></div>
+    </div>
+
+    <!-- SheetJS Library for Excel Support -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <script src="script.js"></script>
+    
+    <script>
+        // Test 1: Product Table
+        function testTable1() {
+            const markdown = `| Product | Price | Stock | Category |
+|---------|-------|-------|----------|
+| Laptop | $999 | 50 | Electronics |
+| Mouse | $29 | 200 | Accessories |
+| Keyboard | $79 | 150 | Accessories |
+| Monitor | $299 | 75 | Electronics |`;
+            renderTest('output1', markdown);
+        }
+
+        // Test 2: Employee Table
+        function testTable2() {
+            const markdown = `| Name | Position | Department | Salary |
+|------|----------|------------|--------|
+| John Smith | Manager | Sales | $85,000 |
+| Jane Doe | Developer | Engineering | $95,000 |
+| Bob Johnson | Designer | Marketing | $70,000 |
+| Alice Williams | Analyst | Finance | $75,000 |
+| Charlie Brown | Director | Operations | $110,000 |`;
+            renderTest('output2', markdown);
+        }
+
+        // Test 3: Sales Data Table
+        function testTable3() {
+            const markdown = `| Quarter | Revenue | Profit | Growth % |
+|---------|---------|--------|----------|
+| Q1 2024 | $2.5M | $450K | 12.3% |
+| Q2 2024 | $2.8M | $520K | 15.6% |
+| Q3 2024 | $3.1M | $580K | 18.2% |
+| Q4 2024 | $3.4M | $650K | 21.5% |`;
+            renderTest('output3', markdown);
+        }
+
+        // Test 4: JSON Data
+        function testJSON() {
+            const jsonData = [
+                {"Company": "Apple", "Market Cap": "$3.0T", "Industry": "Technology"},
+                {"Company": "Microsoft", "Market Cap": "$2.8T", "Industry": "Technology"},
+                {"Company": "Google", "Market Cap": "$1.7T", "Industry": "Technology"},
+                {"Company": "Amazon", "Market Cap": "$1.5T", "Industry": "E-commerce"}
+            ];
+            
+            const output = document.getElementById('output4');
+            output.innerHTML = '<h3>Parsed Data:</h3>';
+            
+            // Show as table
+            let html = '<div class="markdown-table-wrapper"><table class="markdown-table">';
+            html += '<thead><tr>';
+            Object.keys(jsonData[0]).forEach(key => {
+                html += `<th>${key}</th>`;
+            });
+            html += '</tr></thead><tbody>';
+            
+            jsonData.forEach(row => {
+                html += '<tr>';
+                Object.values(row).forEach(value => {
+                    html += `<td>${value}</td>`;
+                });
+                html += '</tr>';
+            });
+            html += '</tbody></table></div>';
+            
+            output.innerHTML += html;
+            
+            // Generate download links
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+            const downloadLinks = generateDownloadLinks(jsonData, `companies_${timestamp}`);
+            output.appendChild(downloadLinks);
+        }
+
+        // Generic render function
+        function renderTest(outputId, markdownText) {
+            const output = document.getElementById(outputId);
+            
+            // Parse the markdown table
+            const formattedHTML = formatMarkdownTables(markdownText);
+            output.innerHTML = '<h3>Rendered Table:</h3>' + formattedHTML;
+            
+            // Extract data and generate download links
+            const extractedData = extractDataFromResponse(markdownText);
+            
+            if (extractedData && extractedData.length > 0) {
+                const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+                const downloadLinks = generateDownloadLinks(extractedData, `table_${timestamp}`);
+                output.appendChild(downloadLinks);
+            } else {
+                output.innerHTML += '<p style="color: var(--danger-color); margin-top: 10px;">⚠️ Could not extract data for download</p>';
+            }
+        }
+    </script>
+</body>
+</html>
