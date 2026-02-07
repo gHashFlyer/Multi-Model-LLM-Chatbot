@@ -503,11 +503,19 @@ function renderMessages() {
 }
 
 function formatMessageContent(content) {
-    // Escape HTML first
-    let formatted = escapeHtml(content);
+    // Extract and process markdown tables BEFORE escaping HTML
+    const tablePlaceholders = [];
+    const tableRegex = /(\|[^\n]+\|[\r\n]+\|[\s\-:|]+\|[\r\n]+(?:\|[^\n]+\|[\r\n]+)*)/g;
     
-    // Format markdown tables
-    formatted = formatMarkdownTables(formatted);
+    // Find all tables and replace with placeholders
+    let formatted = content.replace(tableRegex, (match) => {
+        const placeholder = `__TABLE_PLACEHOLDER_${tablePlaceholders.length}__`;
+        tablePlaceholders.push(renderMarkdownTableToHTML(match));
+        return placeholder;
+    });
+    
+    // Now escape HTML (this won't affect our placeholders)
+    formatted = escapeHtml(formatted);
     
     // Format code blocks with syntax highlighting
     formatted = formatted.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
@@ -529,6 +537,11 @@ function formatMessageContent(content) {
     
     // Format italic text
     formatted = formatted.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    
+    // Restore table HTML by replacing placeholders
+    tablePlaceholders.forEach((tableHTML, index) => {
+        formatted = formatted.replace(`__TABLE_PLACEHOLDER_${index}__`, tableHTML);
+    });
     
     return formatted;
 }
@@ -576,61 +589,58 @@ function highlightSyntax(code, language) {
 }
 
 /**
- * Format markdown tables to HTML
- * @param {string} text - Text containing markdown tables
- * @returns {string} HTML formatted text with tables
+ * Render a single markdown table to HTML
+ * @param {string} tableText - Markdown table text
+ * @returns {string} HTML formatted table
  */
-function formatMarkdownTables(text) {
-    // Regex to match markdown tables (with or without alignment row)
-    const tableRegex = /(\|[^\n]+\|[\r\n]+\|[\s\-:|]+\|[\r\n]+(?:\|[^\n]+\|[\r\n]+)*)/g;
+function renderMarkdownTableToHTML(tableText) {
+    const lines = tableText.trim().split(/[\r\n]+/);
+    if (lines.length < 3) return tableText; // Need header + separator + at least one row
     
-    return text.replace(tableRegex, (match) => {
-        const lines = match.trim().split(/[\r\n]+/);
-        if (lines.length < 2) return match;
-        
-        // First line is headers
-        const headerLine = lines[0];
-        const headers = headerLine.split('|')
-            .map(h => h.trim())
-            .filter(h => h.length > 0);
-        
-        // Second line is separator (can contain alignment info)
-        // Skip it for rendering but could parse alignment here if needed
-        
-        // Remaining lines are data rows
-        const dataRows = lines.slice(2).map(line => {
-            return line.split('|')
-                .map(cell => cell.trim())
-                .filter((cell, index) => index > 0 && index <= headers.length);
-        });
-        
-        // Build HTML table
-        let html = '<div class="markdown-table-wrapper">';
-        html += '<table class="markdown-table">';
-        
-        // Table header
-        html += '<thead><tr>';
-        headers.forEach(header => {
-            html += `<th>${header}</th>`;
-        });
-        html += '</tr></thead>';
-        
-        // Table body
-        html += '<tbody>';
-        dataRows.forEach(row => {
+    // First line is headers
+    const headerLine = lines[0];
+    const headers = headerLine.split('|')
+        .map(h => h.trim())
+        .filter(h => h.length > 0);
+    
+    if (headers.length === 0) return tableText;
+    
+    // Second line is separator (skip it)
+    // Remaining lines are data rows
+    const dataRows = lines.slice(2).map(line => {
+        return line.split('|')
+            .map(cell => cell.trim())
+            .filter((cell, index) => index > 0 && index <= headers.length);
+    });
+    
+    // Build HTML table
+    let html = '<div class="markdown-table-wrapper">';
+    html += '<table class="markdown-table">';
+    
+    // Table header
+    html += '<thead><tr>';
+    headers.forEach(header => {
+        html += `<th>${escapeHtml(header)}</th>`;
+    });
+    html += '</tr></thead>';
+    
+    // Table body
+    html += '<tbody>';
+    dataRows.forEach(row => {
+        if (row.length > 0) {
             html += '<tr>';
             row.forEach(cell => {
-                html += `<td>${cell}</td>`;
+                html += `<td>${escapeHtml(cell)}</td>`;
             });
             html += '</tr>';
-        });
-        html += '</tbody>';
-        
-        html += '</table>';
-        html += '</div>';
-        
-        return html;
+        }
     });
+    html += '</tbody>';
+    
+    html += '</table>';
+    html += '</div>';
+    
+    return html;
 }
 
 /**

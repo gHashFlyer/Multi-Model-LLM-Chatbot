@@ -206,7 +206,7 @@
             const output = document.getElementById(outputId);
             
             // Parse the markdown table
-            const formattedHTML = formatMarkdownTables(markdownText);
+            const formattedHTML = renderMarkdownTableToHTML(markdownText);
             output.innerHTML = '<h3>Rendered Table:</h3>' + formattedHTML;
             
             // Extract data and generate download links
