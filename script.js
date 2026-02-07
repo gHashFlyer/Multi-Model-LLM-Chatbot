@@ -465,7 +465,7 @@ function renderMessages() {
         return;
     }
     
-    container.innerHTML = conversation.messages.map(msg => {
+    container.innerHTML = conversation.messages.map((msg, index) => {
         let roleLabel = 'You';
         
         if (msg.role === 'assistant') {
@@ -480,8 +480,11 @@ function renderMessages() {
             roleLabel = `${modelName} (${promptTitle}) `;
         }
         
+        // Add a unique id to each message for scrolling purposes
+        const messageId = `message-${index}`;
+        
         return `
-            <div class="message ${msg.role}">
+            <div class="message ${msg.role}" id="${messageId}">
                 <div class="message-role">${roleLabel}</div>
                 <div class="message-content">${formatMessageContent(msg.content)}</div>
             </div>
@@ -604,6 +607,28 @@ function hideLoadingIndicator() {
 function scrollToBottom() {
     const container = document.getElementById('messagesContainer');
     container.scrollTop = container.scrollHeight;
+}
+
+function scrollToLastAssistantMessage() {
+    const conversation = getCurrentConversation();
+    if (!conversation || conversation.messages.length === 0) return;
+    
+    // Find the index of the last assistant message
+    let lastAssistantIndex = -1;
+    for (let i = conversation.messages.length - 1; i >= 0; i--) {
+        if (conversation.messages[i].role === 'assistant') {
+            lastAssistantIndex = i;
+            break;
+        }
+    }
+    
+    if (lastAssistantIndex === -1) return;
+    
+    // Scroll to the top of that message
+    const messageElement = document.getElementById(`message-${lastAssistantIndex}`);
+    if (messageElement) {
+        messageElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
 }
 
 function updateCostDisplay() {
@@ -1269,6 +1294,9 @@ async function sendMessage() {
         updateCostDisplay();
         renderConversationsList();
         
+        // Scroll to the top of the last assistant response
+        scrollToLastAssistantMessage();
+        
     } catch (error) {
         console.error('API Error:', error);
         
@@ -1282,6 +1310,9 @@ async function sendMessage() {
         
         saveToLocalStorage();
         renderMessages();
+        
+        // Scroll to the top of the error message
+        scrollToLastAssistantMessage();
     } finally {
         state.isLoading = false;
         sendBtn.disabled = false;
