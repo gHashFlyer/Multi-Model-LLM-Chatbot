@@ -465,12 +465,28 @@ function renderMessages() {
         return;
     }
     
-    container.innerHTML = conversation.messages.map(msg => `
-        <div class="message ${msg.role}">
-            <div class="message-role">${msg.role === 'user' ? 'You' : 'Assistant'}</div>
-            <div class="message-content">${formatMessageContent(msg.content)}</div>
-        </div>
-    `).join('');
+    container.innerHTML = conversation.messages.map(msg => {
+        let roleLabel = 'You';
+        
+        if (msg.role === 'assistant') {
+            // Get system prompt title
+            const systemPrompt = systemPrompts.find(p => p.id === msg.systemPromptId);
+            const promptTitle = systemPrompt ? systemPrompt.title : 'None';
+            
+            // Get model name
+            const modelName = msg.model || conversation.model;
+            
+            // Format: "System Prompt Title) Model Name"
+            roleLabel = `${promptTitle}) ${modelName}`;
+        }
+        
+        return `
+            <div class="message ${msg.role}">
+                <div class="message-role">${roleLabel}</div>
+                <div class="message-content">${formatMessageContent(msg.content)}</div>
+            </div>
+        `;
+    }).join('');
     
     scrollToBottom();
 }
@@ -1190,7 +1206,9 @@ async function sendMessage() {
         // Add assistant message
         conversation.messages.push({
             role: 'assistant',
-            content: response.content
+            content: response.content,
+            model: conversation.model,
+            systemPromptId: state.currentSystemPromptId
         });
         
         // Calculate and update cost using actual usage if available, otherwise estimate
@@ -1233,7 +1251,9 @@ async function sendMessage() {
         // Add error message
         conversation.messages.push({
             role: 'assistant',
-            content: `Error: ${error.message}\n\nPlease check your API key and ensure CORS is properly configured. See Technical Notes for more information.`
+            content: `Error: ${error.message}\n\nPlease check your API key and ensure CORS is properly configured. See Technical Notes for more information.`,
+            model: conversation.model,
+            systemPromptId: state.currentSystemPromptId
         });
         
         saveToLocalStorage();
