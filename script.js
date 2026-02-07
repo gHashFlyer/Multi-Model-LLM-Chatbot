@@ -483,10 +483,18 @@ function renderMessages() {
         // Add a unique id to each message for scrolling purposes
         const messageId = `message-${index}`;
         
+        // Enhance assistant messages with download links if applicable
+        let messageContent = msg.content;
+        if (msg.role === 'assistant') {
+            messageContent = enhanceMessageWithDownloads(messageContent);
+        } else {
+            messageContent = formatMessageContent(messageContent);
+        }
+        
         return `
             <div class="message ${msg.role}" id="${messageId}">
                 <div class="message-role">${roleLabel}</div>
-                <div class="message-content">${formatMessageContent(msg.content)}</div>
+                <div class="message-content">${messageContent}</div>
             </div>
         `;
     }).join('');
@@ -746,6 +754,228 @@ function calculateCost(inputTokens, outputTokens, modelId) {
     const outputCost = (outputTokens / 1000000) * pricing.output;
     
     return inputCost + outputCost;
+}
+
+// ============================================
+// CSV/EXCEL CONVERSION & DOWNLOAD FUNCTIONS
+// ============================================
+
+/**
+ * Convert JSON data to CSV format
+ * @param {Array} data - Array of objects to convert
+ * @returns {string} CSV formatted string
+ */
+function convertToCSV(data) {
+    if (!data || data.length === 0) return '';
+    
+    const headers = Object.keys(data[0]);
+    const csvContent = [
+        headers.join(','),
+        ...data.map(row =>
+            headers.map(header => {
+                const value = row[header] || '';
+                // Escape values containing commas or quotes
+                return typeof value === 'string' && (value.includes(',') || value.includes('"'))
+                    ? `"${value.replace(/"/g, '""')}"`
+                    : value;
+            }).join(',')
+        )
+    ].join('\n');
+    
+    return csvContent;
+}
+
+/**
+ * Convert JSON data to Excel format using SheetJS
+ * @param {Array} data - Array of objects to convert
+ * @param {string} sheetName - Name of the Excel sheet
+ * @returns {ArrayBuffer|null} Excel file data or null if library not loaded
+ */
+function convertToExcel(data, sheetName = 'Sheet1') {
+    const XLSX = window.XLSX;
+    if (!XLSX) {
+        console.error('SheetJS library not loaded');
+        return null;
+    }
+    
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    
+    return XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+}
+
+/**
+ * Create a styled download link for a file
+ * @param {string|ArrayBuffer} data - File data
+ * @param {string} filename - Name of the file to download
+ * @param {string} mimeType - MIME type of the file
+ * @returns {HTMLAnchorElement} Download link element
+ */
+function createDownloadLink(data, filename, mimeType) {
+    const blob = new Blob([data], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.textContent = `Download ${filename}`;
+    link.style.display = 'inline-block';
+    link.style.padding = '8px 16px';
+    link.style.backgroundColor = 'var(--accent-color)';
+    link.style.color = 'white';
+    link.style.textDecoration = 'none';
+    link.style.borderRadius = '4px';
+    link.style.margin = '5px';
+    link.style.cursor = 'pointer';
+    link.style.fontSize = '14px';
+    link.style.fontWeight = '500';
+    link.style.transition = 'all 0.2s ease';
+    
+    link.addEventListener('mouseover', function() {
+        this.style.opacity = '0.9';
+        this.style.transform = 'translateY(-1px)';
+    });
+    
+    link.addEventListener('mouseout', function() {
+        this.style.opacity = '1';
+        this.style.transform = 'translateY(0)';
+    });
+    
+    link.addEventListener('click', function() {
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
+    
+    return link;
+}
+
+/**
+ * Generate download links for CSV and Excel formats
+ * @param {Array} data - Array of objects to convert
+ * @param {string} baseFilename - Base name for the files
+ * @returns {HTMLDivElement} Container with download links
+ */
+function generateDownloadLinks(data, baseFilename = 'data') {
+    const container = document.createElement('div');
+    container.className = 'download-links-container';
+    container.style.margin = '10px 0';
+    container.style.padding = '12px';
+    container.style.backgroundColor = 'var(--sidebar-bg)';
+    container.style.borderRadius = '8px';
+    container.style.border = '1px solid var(--border-color)';
+    
+    const title = document.createElement('div');
+    title.textContent = '📥 Download Options:';
+    title.style.marginBottom = '8px';
+    title.style.fontWeight = '600';
+    title.style.fontSize = '14px';
+    title.style.color = 'var(--text-color)';
+    container.appendChild(title);
+    
+    const linksWrapper = document.createElement('div');
+    linksWrapper.style.display = 'flex';
+    linksWrapper.style.flexWrap = 'wrap';
+    linksWrapper.style.gap = '8px';
+    
+    // Create CSV download link
+    const csvData = convertToCSV(data);
+    const csvLink = createDownloadLink(csvData, `${baseFilename}.csv`, 'text/csv');
+    linksWrapper.appendChild(csvLink);
+    
+    // Create Excel download link if SheetJS is available
+    if (window.XLSX) {
+        const excelData = convertToExcel(data);
+        if (excelData) {
+            const excelLink = createDownloadLink(
+                excelData,
+                `${baseFilename}.xlsx`,
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            );
+            linksWrapper.appendChild(excelLink);
+        }
+    }
+    
+    container.appendChild(linksWrapper);
+    return container;
+}
+
+/**
+ * Extract structured data from LLM response text
+ * Attempts to find JSON arrays or table-like data
+ * @param {string} text - Response text to parse
+ * @returns {Array|null} Extracted data array or null
+ */
+function extractDataFromResponse(text) {
+    // Try to find JSON arrays in the text
+    const jsonArrayRegex = /\[\s*\{[\s\S]*?\}\s*\]/g;
+    const matches = text.match(jsonArrayRegex);
+    
+    if (matches) {
+        for (const match of matches) {
+            try {
+                const data = JSON.parse(match);
+                if (Array.isArray(data) && data.length > 0 && typeof data[0] === 'object') {
+                    return data;
+                }
+            } catch (e) {
+                // Continue to next match
+            }
+        }
+    }
+    
+    return null;
+}
+
+/**
+ * Check if a message mentions CSV/Excel conversion
+ * @param {string} content - Message content
+ * @returns {boolean} True if conversion is mentioned
+ */
+function mentionsDataConversion(content) {
+    const lowerContent = content.toLowerCase();
+    const conversionKeywords = [
+        'csv', 'excel', 'spreadsheet', 'download',
+        'export', 'table', 'xlsx'
+    ];
+    
+    return conversionKeywords.some(keyword => lowerContent.includes(keyword));
+}
+
+/**
+ * Enhance message content with download links if structured data is detected
+ * @param {string} content - Original message content
+ * @returns {string} Enhanced content with download links
+ */
+function enhanceMessageWithDownloads(content) {
+    // Check if message mentions data conversion
+    if (!mentionsDataConversion(content)) {
+        return content;
+    }
+    
+    // Try to extract structured data
+    const extractedData = extractDataFromResponse(content);
+    
+    if (extractedData && extractedData.length > 0) {
+        // Generate a unique filename based on timestamp
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+        const baseFilename = `export_${timestamp}`;
+        
+        // Create a wrapper div for the enhanced content
+        const wrapper = document.createElement('div');
+        
+        // Add the original content
+        const contentDiv = document.createElement('div');
+        contentDiv.innerHTML = formatMessageContent(content);
+        wrapper.appendChild(contentDiv);
+        
+        // Add download links
+        const downloadLinks = generateDownloadLinks(extractedData, baseFilename);
+        wrapper.appendChild(downloadLinks);
+        
+        return wrapper.innerHTML;
+    }
+    
+    return content;
 }
 
 // ============================================

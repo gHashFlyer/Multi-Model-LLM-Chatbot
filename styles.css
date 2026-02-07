@@ -892,6 +892,56 @@ html, body {
     color: var(--success-color);
 }
 
+/* ============================================
+   CSV/EXCEL DOWNLOAD LINKS STYLES
+   ============================================ */
+.download-links-container {
+    margin: 15px 0;
+    padding: 15px;
+    background-color: var(--sidebar-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.download-links-container a {
+    display: inline-block;
+    padding: 10px 18px;
+    background-color: var(--accent-color);
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+    margin: 5px;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.download-links-container a:hover {
+    background-color: var(--accent-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.download-links-container a:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
 .api-key-status.missing {
     background-color: rgba(220, 53, 69, 0.15);
     color: var(--danger-color);
