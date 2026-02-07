@@ -477,7 +477,7 @@ function renderMessages() {
             const modelName = msg.model || conversation.model;
             
             // Format: "System Prompt Title) Model Name"
-            roleLabel = `${promptTitle}) ${modelName}`;
+            roleLabel = `${modelName} (${promptTitle}) `;
         }
         
         return `
