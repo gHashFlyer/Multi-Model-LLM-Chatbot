@@ -806,6 +806,9 @@ function renderModelSelector(catalog, selectedModelId) {
     let optionsHtml = '';
 
     providerOrder.forEach(provider => {
+        // Skip providers without API keys (except ollama which doesn't require one)
+        if (!hasApiKeyForProvider(provider)) return;
+        
         const models = normalized[provider] || [];
         if (!models.length) return;
 
@@ -818,7 +821,7 @@ function renderModelSelector(catalog, selectedModelId) {
     });
 
     if (!optionsHtml) {
-        optionsHtml = '<option value="" disabled>Models unavailable</option>';
+        optionsHtml = '<option value="" disabled>No models available - please configure API keys</option>';
     }
 
     select.innerHTML = optionsHtml;
@@ -1040,11 +1043,32 @@ async function fetchAvailableModels() {
 function mergeCatalogWithDefaults(catalog) {
     const merged = { ...catalog };
     Object.keys(DEFAULT_MODELS).forEach(provider => {
-        if (!merged[provider] || merged[provider].length === 0) {
+        // Only include default models for providers with API keys
+        if (hasApiKeyForProvider(provider) && (!merged[provider] || merged[provider].length === 0)) {
             merged[provider] = DEFAULT_MODELS[provider];
         }
     });
     return merged;
+}
+
+// Helper function to check if a provider has an API key configured
+function hasApiKeyForProvider(provider) {
+    switch (provider) {
+        case 'ollama':
+            return true; // Ollama doesn't require an API key
+        case 'deepseek':
+            return GLOBAL_CONFIG.apiKeys.deepseek && GLOBAL_CONFIG.apiKeys.deepseek !== 'YOUR_DEEPSEEK_API_KEY';
+        case 'grok':
+            return GLOBAL_CONFIG.apiKeys.grok && GLOBAL_CONFIG.apiKeys.grok !== 'YOUR_GROK_API_KEY';
+        case 'anthropic':
+            return GLOBAL_CONFIG.apiKeys.anthropic && GLOBAL_CONFIG.apiKeys.anthropic !== 'YOUR_ANTHROPIC_API_KEY';
+        case 'openai':
+            return GLOBAL_CONFIG.apiKeys.openai && GLOBAL_CONFIG.apiKeys.openai !== 'YOUR_OPENAI_API_KEY';
+        case 'gemini':
+            return GLOBAL_CONFIG.apiKeys.gemini && GLOBAL_CONFIG.apiKeys.gemini !== 'YOUR_GEMINI_API_KEY';
+        default:
+            return false;
+    }
 }
 
 function handleSystemPromptChange() {
@@ -1665,7 +1689,7 @@ function getInputValue(id) {
     return input ? input.value.trim() : '';
 }
 
-function saveApiKeys() {
+async function saveApiKeys() {
     const anthropicKey = getInputValue('anthropicKeyInput');
     const openaiKey = getInputValue('openaiKeyInput');
     const geminiKey = getInputValue('geminiKeyInput');
@@ -1691,6 +1715,9 @@ function saveApiKeys() {
     updateApiKeyStatuses();
     closeApiKeysModal();
     showSuccessToast();
+    
+    // Refresh model selector to reflect new API keys
+    await initModelSelector();
 }
 
 function loadApiKeysFromStorage() {
