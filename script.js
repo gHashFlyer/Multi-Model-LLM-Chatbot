@@ -6,7 +6,9 @@ const GLOBAL_CONFIG = {
     apiKeys: {
         anthropic: 'YOUR_ANTHROPIC_API_KEY',
         openai: 'YOUR_OPENAI_API_KEY',
-        gemini: 'YOUR_GEMINI_API_KEY'
+        gemini: 'YOUR_GEMINI_API_KEY',
+        deepseek: 'YOUR_DEEPSEEK_API_KEY',
+        grok: 'YOUR_GROK_API_KEY'
     },
     
     // API Endpoints
@@ -15,7 +17,13 @@ const GLOBAL_CONFIG = {
         anthropicModels: 'https://api.anthropic.com/v1/models',
         openai: 'https://api.openai.com/v1/chat/completions',
         openaiModels: 'https://api.openai.com/v1/models',
-        gemini: 'https://generativelanguage.googleapis.com/v1beta/models'
+        gemini: 'https://generativelanguage.googleapis.com/v1beta/models',
+        deepseek: 'https://api.deepseek.com/v1/chat/completions',
+        deepseekModels: 'https://api.deepseek.com/v1/models',
+        grok: 'https://api.x.ai/v1/chat/completions',
+        grokModels: 'https://api.x.ai/v1/models',
+        ollama: 'http://localhost:11434/v1/chat/completions',
+        ollamaModels: 'http://localhost:11434/v1/models'
     },
     
     // Default Settings
@@ -93,6 +101,18 @@ const PRICING_TABLE = {
 // MODEL CATALOG (fallback + cache)
 // ============================================
 const DEFAULT_MODELS = {
+    ollama: [
+        { id: 'llama3.1', label: 'Llama 3.1 (Ollama)' },
+        { id: 'llama3', label: 'Llama 3 (Ollama)' }
+    ],
+    deepseek: [
+        { id: 'deepseek-chat', label: 'DeepSeek Chat' },
+        { id: 'deepseek-reasoner', label: 'DeepSeek Reasoner' }
+    ],
+    grok: [
+        { id: 'grok-2-latest', label: 'Grok 2 (Latest)' },
+        { id: 'grok-2', label: 'Grok 2' }
+    ],
     anthropic: [
         { id: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet' },
         { id: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku' },
@@ -128,6 +148,9 @@ const OPENAI_CHAT_COMPLETIONS_PREFIXES = [
 const TEXT_ONLY_MODEL_EXCLUDE = /-(realtime|audio|vision|image|embedding|transcribe|tts|speech|search|computer|cu)/i;
 
 const PROVIDER_LABELS = {
+    ollama: 'Ollama',
+    deepseek: 'DeepSeek',
+    grok: 'Grok (xAI)',
     anthropic: 'Anthropic',
     openai: 'OpenAI',
     gemini: 'Google Gemini'
@@ -606,6 +629,12 @@ function getModelDisplayName(modelId) {
     if (catalogLabel) return catalogLabel;
 
     const names = {
+        'llama3.1': 'Llama 3.1 (Ollama)',
+        'llama3': 'Llama 3 (Ollama)',
+        'deepseek-chat': 'DeepSeek Chat',
+        'deepseek-reasoner': 'DeepSeek Reasoner',
+        'grok-2-latest': 'Grok 2 (Latest)',
+        'grok-2': 'Grok 2',
         'claude-3-5-sonnet-20241022': 'Claude 3.5 Sonnet',
         'claude-3-5-haiku-20241022': 'Claude 3.5 Haiku',
         'claude-sonnet-4-20250514': 'Claude 4 Sonnet',
@@ -639,7 +668,24 @@ function findCatalogLabel(modelId) {
     return null;
 }
 
+function findProviderForModel(modelId) {
+    if (!state.availableModels) return null;
+    for (const [provider, models] of Object.entries(state.availableModels)) {
+        const hasMatch = (models || []).some(model => {
+            if (typeof model === 'string') return model === modelId;
+            return model?.id === modelId;
+        });
+        if (hasMatch) return provider;
+    }
+    return null;
+}
+
 function getProvider(modelId) {
+    const catalogProvider = findProviderForModel(modelId);
+    if (catalogProvider) return catalogProvider;
+    if (modelId === 'llama3.1' || modelId === 'llama3' || modelId.startsWith('ollama/')) return 'ollama';
+    if (modelId.startsWith('deepseek')) return 'deepseek';
+    if (modelId.startsWith('grok')) return 'grok';
     if (modelId.startsWith('claude')) return 'anthropic';
     if (modelId.startsWith('gpt') || /^o\d/.test(modelId)) return 'openai';
     if (modelId.startsWith('gemini')) return 'gemini';
@@ -740,7 +786,7 @@ function renderModelSelector(catalog, selectedModelId) {
     if (!select) return;
 
     const normalized = normalizeModelCatalog(catalog);
-    const providerOrder = ['anthropic', 'openai', 'gemini'];
+    const providerOrder = ['ollama', 'deepseek', 'grok', 'anthropic', 'openai', 'gemini'];
     let optionsHtml = '';
 
     providerOrder.forEach(provider => {
@@ -778,6 +824,9 @@ function renderModelSelector(catalog, selectedModelId) {
 
 function normalizeModelCatalog(catalog) {
     const normalized = {
+        ollama: [],
+        deepseek: [],
+        grok: [],
         anthropic: [],
         openai: [],
         gemini: []
@@ -801,6 +850,12 @@ function normalizeModelCatalog(catalog) {
 function isChatModelForProvider(provider, modelId) {
     if (!modelId) return false;
     switch (provider) {
+        case 'ollama':
+            return !TEXT_ONLY_MODEL_EXCLUDE.test(modelId);
+        case 'deepseek':
+            return modelId.startsWith('deepseek') && !TEXT_ONLY_MODEL_EXCLUDE.test(modelId);
+        case 'grok':
+            return modelId.startsWith('grok') && !TEXT_ONLY_MODEL_EXCLUDE.test(modelId);
         case 'anthropic':
             return modelId.startsWith('claude') && !TEXT_ONLY_MODEL_EXCLUDE.test(modelId);
         case 'openai':
@@ -820,14 +875,77 @@ function isOpenAIChatCompletionsModel(modelId) {
 
 async function fetchAvailableModels() {
     const catalog = {
+        ollama: [],
+        deepseek: [],
+        grok: [],
         anthropic: [],
         openai: [],
         gemini: []
     };
 
+    const hasDeepSeekKey = GLOBAL_CONFIG.apiKeys.deepseek && GLOBAL_CONFIG.apiKeys.deepseek !== 'YOUR_DEEPSEEK_API_KEY';
+    const hasGrokKey = GLOBAL_CONFIG.apiKeys.grok && GLOBAL_CONFIG.apiKeys.grok !== 'YOUR_GROK_API_KEY';
     const hasAnthropicKey = GLOBAL_CONFIG.apiKeys.anthropic && GLOBAL_CONFIG.apiKeys.anthropic !== 'YOUR_ANTHROPIC_API_KEY';
     const hasOpenAIKey = GLOBAL_CONFIG.apiKeys.openai && GLOBAL_CONFIG.apiKeys.openai !== 'YOUR_OPENAI_API_KEY';
     const hasGeminiKey = GLOBAL_CONFIG.apiKeys.gemini && GLOBAL_CONFIG.apiKeys.gemini !== 'YOUR_GEMINI_API_KEY';
+
+    try {
+        const response = await fetch(GLOBAL_CONFIG.endpoints.ollamaModels);
+        if (response.ok) {
+            const data = await response.json();
+            catalog.ollama = (data.data || [])
+                .map(model => ({
+                    id: model.id,
+                    label: model.id
+                }));
+        }
+    } catch (error) {
+        console.warn('Ollama models fetch failed:', error);
+    }
+
+    try {
+        if (hasDeepSeekKey) {
+            const response = await fetch(GLOBAL_CONFIG.endpoints.deepseekModels, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${GLOBAL_CONFIG.apiKeys.deepseek}`
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                catalog.deepseek = (data.data || [])
+                    .map(model => ({
+                        id: model.id,
+                        label: model.id
+                    }));
+            }
+        }
+    } catch (error) {
+        console.warn('DeepSeek models fetch failed:', error);
+    }
+
+    try {
+        if (hasGrokKey) {
+            const response = await fetch(GLOBAL_CONFIG.endpoints.grokModels, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${GLOBAL_CONFIG.apiKeys.grok}`
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                catalog.grok = (data.data || [])
+                    .map(model => ({
+                        id: model.id,
+                        label: model.id
+                    }));
+            }
+        }
+    } catch (error) {
+        console.warn('Grok models fetch failed:', error);
+    }
 
     try {
         if (hasAnthropicKey) {
@@ -1047,6 +1165,15 @@ async function sendMessage() {
         let response;
         
         switch (provider) {
+            case 'ollama':
+                response = await callOllamaAPI(conversation);
+                break;
+            case 'deepseek':
+                response = await callDeepSeekAPI(conversation);
+                break;
+            case 'grok':
+                response = await callGrokAPI(conversation);
+                break;
             case 'anthropic':
                 response = await callAnthropicAPI(conversation);
                 break;
@@ -1195,6 +1322,134 @@ async function callOpenAIAPI(conversation) {
         throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
     }
     
+    const data = await response.json();
+    return {
+        content: data.choices[0].message.content,
+        usage: {
+            input_tokens: data.usage?.prompt_tokens || 0,
+            output_tokens: data.usage?.completion_tokens || 0
+        }
+    };
+}
+
+async function callDeepSeekAPI(conversation) {
+    const messages = conversation.messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+    }));
+
+    const systemPrompt = getCurrentSystemPrompt();
+    if (systemPrompt) {
+        messages.unshift({
+            role: 'system',
+            content: systemPrompt
+        });
+    }
+
+    const response = await fetch(GLOBAL_CONFIG.endpoints.deepseek, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${GLOBAL_CONFIG.apiKeys.deepseek}`
+        },
+        body: JSON.stringify({
+            model: conversation.model,
+            max_tokens: GLOBAL_CONFIG.defaults.maxTokens,
+            temperature: GLOBAL_CONFIG.defaults.temperature,
+            messages: messages
+        })
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return {
+        content: data.choices[0].message.content,
+        usage: {
+            input_tokens: data.usage?.prompt_tokens || 0,
+            output_tokens: data.usage?.completion_tokens || 0
+        }
+    };
+}
+
+async function callGrokAPI(conversation) {
+    const messages = conversation.messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+    }));
+
+    const systemPrompt = getCurrentSystemPrompt();
+    if (systemPrompt) {
+        messages.unshift({
+            role: 'system',
+            content: systemPrompt
+        });
+    }
+
+    const response = await fetch(GLOBAL_CONFIG.endpoints.grok, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${GLOBAL_CONFIG.apiKeys.grok}`
+        },
+        body: JSON.stringify({
+            model: conversation.model,
+            max_tokens: GLOBAL_CONFIG.defaults.maxTokens,
+            temperature: GLOBAL_CONFIG.defaults.temperature,
+            messages: messages
+        })
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return {
+        content: data.choices[0].message.content,
+        usage: {
+            input_tokens: data.usage?.prompt_tokens || 0,
+            output_tokens: data.usage?.completion_tokens || 0
+        }
+    };
+}
+
+async function callOllamaAPI(conversation) {
+    const messages = conversation.messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+    }));
+
+    const systemPrompt = getCurrentSystemPrompt();
+    if (systemPrompt) {
+        messages.unshift({
+            role: 'system',
+            content: systemPrompt
+        });
+    }
+
+    const response = await fetch(GLOBAL_CONFIG.endpoints.ollama, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            model: conversation.model,
+            max_tokens: GLOBAL_CONFIG.defaults.maxTokens,
+            temperature: GLOBAL_CONFIG.defaults.temperature,
+            messages: messages
+        })
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
     const data = await response.json();
     return {
         content: data.choices[0].message.content,
@@ -1368,6 +1623,14 @@ function showApiKeysModal() {
     document.getElementById('anthropicKeyInput').value = GLOBAL_CONFIG.apiKeys.anthropic !== 'YOUR_ANTHROPIC_API_KEY' ? GLOBAL_CONFIG.apiKeys.anthropic : '';
     document.getElementById('openaiKeyInput').value = GLOBAL_CONFIG.apiKeys.openai !== 'YOUR_OPENAI_API_KEY' ? GLOBAL_CONFIG.apiKeys.openai : '';
     document.getElementById('geminiKeyInput').value = GLOBAL_CONFIG.apiKeys.gemini !== 'YOUR_GEMINI_API_KEY' ? GLOBAL_CONFIG.apiKeys.gemini : '';
+    const deepseekInput = document.getElementById('deepseekKeyInput');
+    if (deepseekInput) {
+        deepseekInput.value = GLOBAL_CONFIG.apiKeys.deepseek !== 'YOUR_DEEPSEEK_API_KEY' ? GLOBAL_CONFIG.apiKeys.deepseek : '';
+    }
+    const grokInput = document.getElementById('grokKeyInput');
+    if (grokInput) {
+        grokInput.value = GLOBAL_CONFIG.apiKeys.grok !== 'YOUR_GROK_API_KEY' ? GLOBAL_CONFIG.apiKeys.grok : '';
+    }
     
     updateApiKeyStatuses();
     document.getElementById('apiKeysModal').classList.add('active');
@@ -1377,21 +1640,32 @@ function closeApiKeysModal() {
     document.getElementById('apiKeysModal').classList.remove('active');
 }
 
+function getInputValue(id) {
+    const input = document.getElementById(id);
+    return input ? input.value.trim() : '';
+}
+
 function saveApiKeys() {
-    const anthropicKey = document.getElementById('anthropicKeyInput').value.trim();
-    const openaiKey = document.getElementById('openaiKeyInput').value.trim();
-    const geminiKey = document.getElementById('geminiKeyInput').value.trim();
+    const anthropicKey = getInputValue('anthropicKeyInput');
+    const openaiKey = getInputValue('openaiKeyInput');
+    const geminiKey = getInputValue('geminiKeyInput');
+    const deepseekKey = getInputValue('deepseekKeyInput');
+    const grokKey = getInputValue('grokKeyInput');
     
     // Update GLOBAL_CONFIG
     GLOBAL_CONFIG.apiKeys.anthropic = anthropicKey || 'YOUR_ANTHROPIC_API_KEY';
     GLOBAL_CONFIG.apiKeys.openai = openaiKey || 'YOUR_OPENAI_API_KEY';
     GLOBAL_CONFIG.apiKeys.gemini = geminiKey || 'YOUR_GEMINI_API_KEY';
+    GLOBAL_CONFIG.apiKeys.deepseek = deepseekKey || 'YOUR_DEEPSEEK_API_KEY';
+    GLOBAL_CONFIG.apiKeys.grok = grokKey || 'YOUR_GROK_API_KEY';
     
     // Save to localStorage
     localStorage.setItem('llm_chatbot_api_keys', JSON.stringify({
         anthropic: anthropicKey,
         openai: openaiKey,
-        gemini: geminiKey
+        gemini: geminiKey,
+        deepseek: deepseekKey,
+        grok: grokKey
     }));
     
     updateApiKeyStatuses();
@@ -1406,13 +1680,29 @@ function loadApiKeysFromStorage() {
         if (keys.anthropic) GLOBAL_CONFIG.apiKeys.anthropic = keys.anthropic;
         if (keys.openai) GLOBAL_CONFIG.apiKeys.openai = keys.openai;
         if (keys.gemini) GLOBAL_CONFIG.apiKeys.gemini = keys.gemini;
+        if (keys.deepseek) GLOBAL_CONFIG.apiKeys.deepseek = keys.deepseek;
+        if (keys.grok) GLOBAL_CONFIG.apiKeys.grok = keys.grok;
     }
 }
 
 function updateApiKeyStatuses() {
+    const deepseekConfigured = GLOBAL_CONFIG.apiKeys.deepseek && GLOBAL_CONFIG.apiKeys.deepseek !== 'YOUR_DEEPSEEK_API_KEY';
+    const grokConfigured = GLOBAL_CONFIG.apiKeys.grok && GLOBAL_CONFIG.apiKeys.grok !== 'YOUR_GROK_API_KEY';
     const anthropicConfigured = GLOBAL_CONFIG.apiKeys.anthropic && GLOBAL_CONFIG.apiKeys.anthropic !== 'YOUR_ANTHROPIC_API_KEY';
     const openaiConfigured = GLOBAL_CONFIG.apiKeys.openai && GLOBAL_CONFIG.apiKeys.openai !== 'YOUR_OPENAI_API_KEY';
     const geminiConfigured = GLOBAL_CONFIG.apiKeys.gemini && GLOBAL_CONFIG.apiKeys.gemini !== 'YOUR_GEMINI_API_KEY';
+
+    const deepseekStatus = document.getElementById('deepseekStatus');
+    if (deepseekStatus) {
+        deepseekStatus.className = `api-key-status ${deepseekConfigured ? 'configured' : 'missing'}`;
+        deepseekStatus.textContent = deepseekConfigured ? '✓ Configured' : '✗ Not set';
+    }
+
+    const grokStatus = document.getElementById('grokStatus');
+    if (grokStatus) {
+        grokStatus.className = `api-key-status ${grokConfigured ? 'configured' : 'missing'}`;
+        grokStatus.textContent = grokConfigured ? '✓ Configured' : '✗ Not set';
+    }
     
     document.getElementById('anthropicStatus').className = `api-key-status ${anthropicConfigured ? 'configured' : 'missing'}`;
     document.getElementById('anthropicStatus').textContent = anthropicConfigured ? '✓ Configured' : '✗ Not set';
