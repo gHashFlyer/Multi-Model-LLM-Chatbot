@@ -102,8 +102,15 @@ const PRICING_TABLE = {
 // ============================================
 const DEFAULT_MODELS = {
     ollama: [
-        { id: 'llama3.1', label: 'Llama 3.1 (Ollama)' },
-        { id: 'llama3', label: 'Llama 3 (Ollama)' }
+        { id: 'nemotron-3-nano:30b', label: 'Nemotron 3 Nano 30B' },
+        { id: 'qwen3-coder:30b', label: 'Qwen 3 Coder 30B' },
+        { id: 'ministral-3:8b', label: 'Ministral 3 8B' },
+        { id: 'volvi/TARS3.3-3B:latest', label: 'TARS 3.3 3B' },
+        { id: 'deepseek-r1:1.5b', label: 'DeepSeek R1 1.5B' },
+        { id: 'gpt-oss:latest', label: 'GPT OSS' },
+        { id: 'qwen2.5-coder:1.5b', label: 'Qwen 2.5 Coder 1.5B' },
+        { id: 'codellama:latest', label: 'CodeLlama' },
+        { id: 'qwen3:8b', label: 'Qwen 3 8B' }
     ],
     deepseek: [
         { id: 'deepseek-chat', label: 'DeepSeek Chat' },
@@ -1176,14 +1183,21 @@ function renderModelSelector(catalog, selectedModelId) {
     if (!select) return;
 
     const normalized = normalizeModelCatalog(catalog);
+    console.log('Rendering model selector with normalized catalog:', normalized);
     const providerOrder = ['ollama', 'deepseek', 'grok', 'anthropic', 'openai', 'gemini'];
     let optionsHtml = '';
 
     providerOrder.forEach(provider => {
         // Skip providers without API keys (except ollama which doesn't require one)
-        if (!hasApiKeyForProvider(provider)) return;
+        const hasKey = hasApiKeyForProvider(provider);
+        console.log(`${provider}: hasApiKey=${hasKey}`);
+        if (!hasKey) {
+            console.log(`Skipping ${provider} - no API key`);
+            return;
+        }
         
         const models = normalized[provider] || [];
+        console.log(`${provider} has ${models.length} models:`, models);
         if (!models.length) return;
 
         optionsHtml += `<optgroup label="${PROVIDER_LABELS[provider]}">`;
@@ -1283,17 +1297,38 @@ async function fetchAvailableModels() {
     const hasGeminiKey = GLOBAL_CONFIG.apiKeys.gemini && GLOBAL_CONFIG.apiKeys.gemini !== 'YOUR_GEMINI_API_KEY';
 
     try {
-        const response = await fetch(GLOBAL_CONFIG.endpoints.ollamaModels);
+        // Set a timeout for the fetch request to avoid long hangs
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
+        
+        const response = await fetch(GLOBAL_CONFIG.endpoints.ollamaModels, {
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
         if (response.ok) {
             const data = await response.json();
-            catalog.ollama = (data.data || [])
-                .map(model => ({
-                    id: model.id,
-                    label: model.id
-                }));
+            console.log('Ollama API response:', data);
+            // Ollama's /v1/models endpoint returns {data: [...]} (OpenAI compatible)
+            // Ollama's /api/tags endpoint returns {models: [...]}
+            const modelsList = data.data || data.models || [];
+            catalog.ollama = modelsList.map(model => {
+                // Handle both formats: {id: "name"} or {name: "name"}
+                const modelId = model.id || model.name;
+                return {
+                    id: modelId,
+                    label: modelId
+                };
+            });
+            console.log('Ollama models loaded:', catalog.ollama);
+        } else {
+            console.warn('Ollama API returned non-OK status:', response.status);
+            catalog.ollama = DEFAULT_MODELS.ollama;
         }
     } catch (error) {
-        console.warn('Ollama models fetch failed:', error);
+        console.warn('Ollama models fetch failed (this is expected when opening file:// directly - use a local server instead):', error.message);
+        // If fetch fails, use default Ollama models as fallback
+        catalog.ollama = DEFAULT_MODELS.ollama;
     }
 
     try {
@@ -1935,21 +1970,35 @@ async function callGeminiAPI(conversation) {
 // ============================================
 // MODAL FUNCTIONS
 // ============================================
-async function showTechNotesModal() {
+// TECHNICAL NOTES (Embedded)
+// ============================================
+const TECHNICAL_NOTES_MD = `# This is a multi-model LLM chat application with model selection, system prompts, API key management, session cost display, and modals for editing system prompts, and viewing these technical notes. Requires styles.css for styling and script.js for interactivity and chat logic.
+
+# ⚠️ Caution
+## This app calls APIs directly from the browser.
+## For a personal local tool, it's acceptable, but you should know that the keys are stored in localStorage.
+## Ideally, you'd want a chatbot to use a backend service to proxy API calls, alas this does not yet support that.
+
+# 🦙 Ollama
+## IF you want to run local ollama models, then you may have to do something about CORS. One way is to set  OLLAMA_ORIGINS=*  Note: you can change the default/fallback models in script.js under Model Catalog.
+
+# 🗓️ Future Plans
+### -Add backend proxy service for API calls
+For example: (1) run a tiny localhost proxy; (2) keep keys in .env; (3) serve the static frontend locally; (4) bind proxy to 127.0.0.1 only.
+### -Add support for more models
+### -Add support for more features
+
+# 🌐 Download Updates from GitHub
+### https://github.com/gHashFlyer/Multi-Model-LLM-Chatbot`;
+
+// ============================================
+function showTechNotesModal() {
     const modal = document.getElementById('techNotesModal');
     const contentDiv = modal.querySelector('.modal-content');
     
-    try {
-        // Fetch the markdown file
-        const response = await fetch('technical-notes.md');
-        const markdown = await response.text();
-        
-        // Convert markdown to HTML
-        const html = convertMarkdownToHTML(markdown);
-        contentDiv.innerHTML = html;
-    } catch (error) {
-        contentDiv.innerHTML = '<p style="color: var(--danger-color);">Failed to load technical notes. Please check if technical-notes.md exists.</p>';
-    }
+    // Convert embedded markdown to HTML
+    const html = convertMarkdownToHTML(TECHNICAL_NOTES_MD);
+    contentDiv.innerHTML = html;
     
     modal.classList.add('active');
 }

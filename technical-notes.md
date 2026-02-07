@@ -5,6 +5,8 @@
 ## For a personal local tool, it’s acceptable, but you should know that the keys are stored in localStorage.
 ## Ideally, you’d want a chatbot to use a backend service to proxy API calls, alas this does not yet support that.
 
+# 🦙 Ollama
+## IF you want to run local ollama models, then you may have to do something about CORS. One way is to set  OLLAMA_ORIGINS=*  Note: you can change the default/fallback models in script.js under Model Catalog.
 
 # 🗓️ Future Plans
 ### -Add backend proxy service for API calls
