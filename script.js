@@ -2238,5 +2238,41 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         closeTechNotesModal();
         closeApiKeysModal();
+        closeSidebar();
+    }
+});
+
+// ============================================
+// MOBILE SIDEBAR TOGGLE
+// ============================================
+function toggleMobileSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    sidebar.classList.toggle('mobile-open');
+}
+
+function closeSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    sidebar.classList.remove('mobile-open');
+}
+
+// Close sidebar when clicking on chat area on mobile
+document.addEventListener('click', (e) => {
+    const sidebar = document.getElementById('sidebar');
+    const menuBtn = document.querySelector('.mobile-menu-btn');
+    const isMobile = window.innerWidth <= 768;
+    
+    if (isMobile &&
+        sidebar.classList.contains('mobile-open') &&
+        !sidebar.contains(e.target) &&
+        !menuBtn.contains(e.target)) {
+        closeSidebar();
+    }
+});
+
+// Close sidebar when window is resized to desktop size
+window.addEventListener('resize', () => {
+    const sidebar = document.getElementById('sidebar');
+    if (window.innerWidth > 768 && sidebar.classList.contains('mobile-open')) {
+        closeSidebar();
     }
 });
