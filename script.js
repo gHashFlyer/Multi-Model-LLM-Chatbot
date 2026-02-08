@@ -176,7 +176,8 @@ let state = {
     isLoading: false,
     theme: 'light',
     availableModels: null,
-    pendingDeleteId: null
+    pendingDeleteId: null,
+    showOllamaModels: true
 };
 
 // ============================================
@@ -232,7 +233,8 @@ function saveToLocalStorage() {
         conversations: state.conversations,
         currentConversationId: state.currentConversationId,
         currentSystemPromptId: state.currentSystemPromptId,
-        theme: state.theme
+        theme: state.theme,
+        showOllamaModels: state.showOllamaModels
     }));
 }
 
@@ -244,6 +246,7 @@ function loadFromLocalStorage() {
         state.currentConversationId = parsed.currentConversationId;
         state.currentSystemPromptId = parsed.currentSystemPromptId || 'none';
         state.theme = parsed.theme || 'light';
+        state.showOllamaModels = parsed.showOllamaModels !== undefined ? parsed.showOllamaModels : true;
         state.conversations.forEach(ensureConversationMetrics);
     }
 }
@@ -1188,6 +1191,12 @@ function renderModelSelector(catalog, selectedModelId) {
     let optionsHtml = '';
 
     providerOrder.forEach(provider => {
+        // Skip Ollama if user has toggled it off
+        if (provider === 'ollama' && !state.showOllamaModels) {
+            console.log('Skipping Ollama - user toggled off');
+            return;
+        }
+        
         // Skip providers without API keys (except ollama which doesn't require one)
         const hasKey = hasApiKeyForProvider(provider);
         console.log(`${provider}: hasApiKey=${hasKey}`);
@@ -2106,11 +2115,29 @@ function showApiKeysModal() {
     }
     
     updateApiKeyStatuses();
+    updateOllamaToggleButton();
     document.getElementById('apiKeysModal').classList.add('active');
 }
 
 function closeApiKeysModal() {
     document.getElementById('apiKeysModal').classList.remove('active');
+}
+
+function toggleOllamaModels() {
+    state.showOllamaModels = !state.showOllamaModels;
+    updateOllamaToggleButton();
+    saveToLocalStorage();
+    
+    // Re-render the model selector to show/hide Ollama models
+    const currentModel = getCurrentConversation()?.model || null;
+    renderModelSelector(state.availableModels || DEFAULT_MODELS, currentModel);
+}
+
+function updateOllamaToggleButton() {
+    const btn = document.getElementById('ollamaToggleBtn');
+    if (btn) {
+        btn.textContent = state.showOllamaModels ? 'Hide Ollama Models' : 'Show Ollama Models';
+    }
 }
 
 function getInputValue(id) {

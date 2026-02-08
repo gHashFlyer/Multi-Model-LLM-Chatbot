@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=1920">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Multi-Model LLM Chatbot</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -123,6 +123,16 @@
                 <p style="margin-bottom: 25px; color: var(--text-muted);">
                     Enter your API keys below. Keys are stored locally in your browser and never sent to any server except the respective API providers.
                 </p>
+
+                <div class="ollama-toggle-row">
+                    <div class="ollama-toggle-text">
+                        <h3>Ollama Models</h3>
+                        <p class="hint">Show or hide local Ollama models in the model selector.</p>
+                    </div>
+                    <button type="button" class="btn-ghost" id="ollamaToggleBtn" onclick="toggleOllamaModels()">
+                        Hide Ollama Models
+                    </button>
+                </div>
                 
                 <div class="form-group">
                     <label>

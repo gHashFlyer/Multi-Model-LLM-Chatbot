@@ -877,6 +877,45 @@ html, body {
     color: var(--text-primary);
 }
 
+.btn-ghost {
+    padding: 8px 16px;
+    background-color: transparent;
+    color: var(--accent-color);
+    border: 1px solid var(--accent-color);
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-ghost:hover {
+    background-color: var(--accent-color);
+    color: white;
+}
+
+.ollama-toggle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    margin-bottom: 20px;
+    background-color: var(--background-secondary);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.ollama-toggle-text h3 {
+    margin: 0 0 5px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.ollama-toggle-text .hint {
+    margin: 0;
+}
+
 .api-key-status {
     display: inline-flex;
     align-items: center;
