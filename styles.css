@@ -740,8 +740,13 @@ html, body {
 }
 
 .empty-state-icon {
-    font-size: 64px;
+    width: 128px;
+    height: 128px;
     margin-bottom: 20px;
+    background-image: url('placeholder.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
     opacity: 0.5;
 }
 

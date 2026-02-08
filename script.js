@@ -467,7 +467,7 @@ function renderMessages() {
     if (!conversation || conversation.messages.length === 0) {
         container.innerHTML = `
             <div class="empty-state">
-                <div class="empty-state-icon">💬</div>
+                <div class="empty-state-icon"></div>
                 <h2>Start a Conversation</h2>
                 <p>Select a model and type your message below to begin chatting with an AI assistant.</p>
             </div>
