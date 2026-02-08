@@ -463,13 +463,14 @@ function renderConversationsList() {
 function renderMessages() {
     const container = document.getElementById('messagesContainer');
     const conversation = getCurrentConversation();
-    
+
+                //     <h2>Start a Conversation</h2>
+                // <p>Select a model and type your message below to begin chatting with an AI assistant.</p>
     if (!conversation || conversation.messages.length === 0) {
         container.innerHTML = `
             <div class="empty-state">
                 <div class="empty-state-icon"></div>
-                <h2>Start a Conversation</h2>
-                <p>Select a model and type your message below to begin chatting with an AI assistant.</p>
+
             </div>
         `;
         return;
