@@ -644,6 +644,12 @@ html, body {
     transition: all 0.3s;
 }
 
+/* Delete Confirmation Modal - Position to the left */
+#deleteConfirmModal {
+    justify-content: flex-start;
+    padding-left: 30px;
+}
+
 .modal-overlay.active {
     opacity: 1;
     visibility: visible;
@@ -658,6 +664,13 @@ html, body {
     overflow-y: auto;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     margin: 20px;
+}
+
+/* Delete Confirmation Modal - Smaller and positioned near sidebar */
+#deleteConfirmModal .modal {
+    max-width: 400px;
+    width: 85%;
+    margin-left: 50px; /* Position closer to left sidebar */
 }
 
 .modal-header {
