@@ -393,12 +393,21 @@ html, body {
     font-size: 13px;
 }
 
-.model-label {
+.current-prompt-display {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    border-left: 1px solid var(--border-color);
+    padding-left: 15px;
+}
+
+.model-label, .prompt-label {
     color: var(--text-muted);
     font-weight: 500;
 }
 
-.model-name {
+.model-name, .prompt-name {
     color: var(--accent-color);
     font-weight: 600;
 }
@@ -565,6 +574,48 @@ html, body {
     font-size: 14px;
     word-wrap: break-word;
     overflow-wrap: break-word;
+    position: relative;
+}
+
+.copy-msg-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(0, 0, 0, 0.1);
+    border: none;
+    border-radius: 4px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: all 0.2s;
+    color: inherit;
+    font-size: 12px;
+    z-index: 2;
+}
+
+.message:hover .copy-msg-btn {
+    opacity: 1;
+}
+
+.copy-msg-btn:hover {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .copy-msg-btn {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .copy-msg-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.message.user .copy-msg-btn {
+    right: 8px;
+    left: auto;
 }
 
 .message.user {
@@ -613,6 +664,9 @@ html, body {
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
     font-size: 13px;
     line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-all;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .code-block-header {

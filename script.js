@@ -192,6 +192,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     initTheme();
     await initModelSelector();
     
+    // Update Ollama toggle button state
+    updateOllamaToggleButton();
+    
     // Start clock
     startClock();
     
@@ -282,19 +285,31 @@ function toggleRightSidebar() {
 
 function updateCurrentModelDisplay() {
     const modelSelect = document.getElementById('modelSelect');
-    const display = document.getElementById('currentModelName');
-    if (modelSelect && display) {
+    const modelDisplay = document.getElementById('currentModelName');
+    const promptSelect = document.getElementById('systemPromptSelect');
+    const promptDisplay = document.getElementById('currentPromptName');
+
+    if (modelSelect && modelDisplay) {
         const selectedOption = modelSelect.options[modelSelect.selectedIndex];
         if (selectedOption && !selectedOption.disabled) {
-            display.textContent = selectedOption.text;
+            modelDisplay.textContent = selectedOption.text;
             // If model is selected, we can hide sidebar if it was open (optional, but task says "indefinitely not hidden if a model is not selected")
             // Interpretation: If no model is selected, sidebar MUST be shown.
             if (!modelSelect.value) {
                 document.getElementById('rightSidebar').classList.add('active');
             }
         } else {
-            display.textContent = 'None';
+            modelDisplay.textContent = 'None';
             document.getElementById('rightSidebar').classList.add('active');
+        }
+    }
+
+    if (promptSelect && promptDisplay) {
+        const selectedOption = promptSelect.options[promptSelect.selectedIndex];
+        if (selectedOption) {
+            promptDisplay.textContent = selectedOption.text;
+        } else {
+            promptDisplay.textContent = 'None';
         }
     }
 }
@@ -580,6 +595,7 @@ function renderMessages() {
         
         return `
             <div class="message ${msg.role}" id="${messageId}">
+                <button class="copy-msg-btn" onclick="copyMessage('${messageId}')" title="Copy message">📋</button>
                 <div class="message-role">${roleLabel}</div>
                 <div class="message-content">${messageContent}</div>
             </div>
@@ -590,22 +606,33 @@ function renderMessages() {
 }
 
 function formatMessageContent(content) {
-    // Extract and process markdown tables BEFORE escaping HTML
+    // 1. Strip existing syntax highlighting spans (if any)
+    // This handles the "Nor should the user see the classes for syntax highlighting" part
+    let formatted = content.replace(/<span class="syntax-[^"]+">([\s\S]*?)<\/span>/g, '$1');
+    
+    // 2. Handle existing <pre><code> blocks
+    // We'll convert them to markdown fences temporarily so they are handled by the existing logic
+    formatted = formatted.replace(/<pre(?:[^>]*)><code(?:[^>]*)>([\s\S]*?)<\/code><\/pre>/g, '```\n$1\n```');
+    
+    // 3. Handle existing <code> blocks (inline)
+    formatted = formatted.replace(/<code(?:[^>]*)>([\s\S]*?)<\/code>/g, '`$1`');
+
+    // 4. Extract and process markdown tables BEFORE escaping HTML
     const tablePlaceholders = [];
     const tableRegex = /(\|[^\n]+\|[\r\n]+\|[\s\-:|]+\|[\r\n]+(?:\|[^\n]+\|[\r\n]+)*)/g;
     
     // Find all tables and replace with placeholders
-    let formatted = content.replace(tableRegex, (match) => {
+    formatted = formatted.replace(tableRegex, (match) => {
         const placeholder = `__TABLE_PLACEHOLDER_${tablePlaceholders.length}__`;
         tablePlaceholders.push(renderMarkdownTableToHTML(match));
         return placeholder;
     });
     
-    // Now escape HTML (this won't affect our placeholders)
+    // 5. Now escape HTML (this won't affect our placeholders)
     formatted = escapeHtml(formatted);
     
-    // Format code blocks with syntax highlighting
-    formatted = formatted.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+    // 6. Format code blocks with syntax highlighting
+    formatted = formatted.replace(/```(\w+)?\s*([\s\S]*?)```/g, (match, lang, code) => {
         const language = lang || 'text';
         const highlighted = highlightSyntax(code.trim(), language);
         const blockId = 'code_' + Math.random().toString(36).substr(2, 9);
@@ -613,19 +640,19 @@ function formatMessageContent(content) {
             <span class="code-block-lang">${language}</span>
             <button class="copy-code-btn" onclick="copyCode('${blockId}')">Copy</button>
         </div>
-        <pre class="code-block with-header" id="${blockId}">${highlighted}</pre>`;
+        <div class="code-block with-header" id="${blockId}">${highlighted}</div>`;
     });
     
-    // Format inline code
+    // 7. Format inline code
     formatted = formatted.replace(/`([^`]+)`/g, '<span class="inline-code">$1</span>');
     
-    // Format bold text
+    // 8. Format bold text
     formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
     
-    // Format italic text
+    // 9. Format italic text
     formatted = formatted.replace(/\*([^*]+)\*/g, '<em>$1</em>');
     
-    // Restore table HTML by replacing placeholders
+    // 10. Restore table HTML by replacing placeholders
     tablePlaceholders.forEach((tableHTML, index) => {
         formatted = formatted.replace(`__TABLE_PLACEHOLDER_${index}__`, tableHTML);
     });
@@ -779,6 +806,27 @@ function copyCode(blockId) {
                 setTimeout(() => { btn.innerText = originalText; }, 2000);
             }
         });
+    }
+}
+
+function copyMessage(messageId) {
+    const messageElement = document.getElementById(messageId);
+    if (messageElement) {
+        const contentElement = messageElement.querySelector('.message-content');
+        if (contentElement) {
+            // We want the text content, but we should be careful about what we copy.
+            // If it's an assistant message, it might have HTML from formatting.
+            // Using innerText usually gets the visible text which is what we want.
+            const text = contentElement.innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = messageElement.querySelector('.copy-msg-btn');
+                if (btn) {
+                    const originalText = btn.innerText;
+                    btn.innerText = '✅';
+                    setTimeout(() => { btn.innerText = originalText; }, 2000);
+                }
+            });
+        }
     }
 }
 
@@ -1155,9 +1203,12 @@ function mentionsDataConversion(content) {
  * @returns {string} Enhanced content with download links
  */
 function enhanceMessageWithDownloads(content) {
+    // Always format the content first
+    const formattedContent = formatMessageContent(content);
+    
     // Check if message mentions data conversion
     if (!mentionsDataConversion(content)) {
-        return content;
+        return formattedContent;
     }
     
     // Try to extract structured data
@@ -1171,9 +1222,9 @@ function enhanceMessageWithDownloads(content) {
         // Create a wrapper div for the enhanced content
         const wrapper = document.createElement('div');
         
-        // Add the original content
+        // Add the formatted content
         const contentDiv = document.createElement('div');
-        contentDiv.innerHTML = formatMessageContent(content);
+        contentDiv.innerHTML = formattedContent;
         wrapper.appendChild(contentDiv);
         
         // Add download links
@@ -1183,7 +1234,7 @@ function enhanceMessageWithDownloads(content) {
         return wrapper.innerHTML;
     }
     
-    return content;
+    return formattedContent;
 }
 
 // ============================================
@@ -1210,6 +1261,7 @@ function renderSystemPromptSelector() {
     select.innerHTML = systemPrompts.map(prompt => 
         `<option value="${prompt.id}" ${prompt.id === state.currentSystemPromptId ? 'selected' : ''}>${prompt.title}</option>`
     ).join('');
+    updateCurrentModelDisplay();
 }
 
 // ============================================
@@ -1574,6 +1626,7 @@ function hasApiKeyForProvider(provider) {
 function handleSystemPromptChange() {
     state.currentSystemPromptId = document.getElementById('systemPromptSelect').value;
     saveToLocalStorage();
+    updateCurrentModelDisplay();
 }
 
 function getCurrentSystemPrompt() {
@@ -2219,6 +2272,10 @@ function updateOllamaToggleButton() {
     const btn = document.getElementById('ollamaToggleBtn');
     if (btn) {
         btn.textContent = state.showOllamaModels ? 'Hide Ollama Models' : 'Show Ollama Models';
+    }
+    const sidebarBtn = document.getElementById('sidebarOllamaToggle');
+    if (sidebarBtn) {
+        sidebarBtn.textContent = state.showOllamaModels ? '🦙 Hide Ollama Models' : '🦙 Show Ollama Models';
     }
 }
 
