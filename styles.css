@@ -276,6 +276,80 @@ html, body {
 }
 
 /* ============================================
+   RIGHT SIDEBAR STYLES (Fly-in)
+   ============================================ */
+.right-sidebar {
+    position: fixed;
+    right: -320px;
+    top: 0;
+    width: 320px;
+    height: 100vh;
+    background-color: var(--bg-sidebar);
+    border-left: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    gap: 25px;
+    z-index: 1000;
+    transition: right 0.3s ease;
+    box-shadow: -5px 0 15px rgba(0, 0, 0, 0.1);
+}
+
+.right-sidebar.active {
+    right: 0;
+}
+
+.settings-btn {
+    width: 100%;
+    padding: 10px;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+}
+
+.settings-btn:hover {
+    border-color: var(--accent-color);
+    background-color: var(--bg-input);
+}
+
+.sidebar-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.sidebar-section h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.right-sidebar .model-selector,
+.right-sidebar .system-prompt-selector {
+    flex-direction: column;
+    align-items: stretch;
+    min-width: 0;
+    margin-left: 0;
+}
+
+.right-sidebar .model-selector select,
+.right-sidebar .system-prompt-selector select {
+    width: 100%;
+}
+
+.right-sidebar .tech-note-btn {
+    width: 100%;
+    padding: 10px;
+}
+
+/* ============================================
    MAIN CHAT AREA
    ============================================ */
 .chat-area {
@@ -289,22 +363,80 @@ html, body {
 
 /* Chat Header */
 .chat-header {
-    padding: 15px 25px;
+    padding: 10px 20px;
     background-color: var(--bg-secondary);
     border-bottom: 1px solid var(--border-color);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 20px;
+    gap: 15px;
     flex-shrink: 0;
-    flex-wrap: wrap;
+    min-height: 60px;
+}
+
+.header-left, .header-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.header-center {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+}
+
+.current-model-display {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.model-label {
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.model-name {
+    color: var(--accent-color);
+    font-weight: 600;
+}
+
+.clock-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+.utc-time {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.toggle-right-sidebar-btn {
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.2s;
+}
+
+.toggle-right-sidebar-btn:hover {
+    background-color: var(--bg-sidebar);
+    border-color: var(--accent-color);
 }
 
 .model-selector {
     display: flex;
     align-items: center;
     gap: 10px;
-    flex: 1;
+    flex: 0 1 auto;
     min-width: 200px;
 }
 
@@ -335,7 +467,7 @@ html, body {
     display: flex;
     align-items: center;
     gap: 10px;
-    flex: 1;
+    flex: 0 1 auto;
     min-width: 200px;
 }
 
@@ -598,7 +730,7 @@ html, body {
 }
 
 .message-input::placeholder {
-    color: var(--text-muted);
+    color: var(--code-bg);
 }
 
 .send-btn {
@@ -755,12 +887,13 @@ html, body {
 .empty-state-icon {
     height:100%;
     width: 100%;
-    margin-bottom: 20px;
-    background-image: url('placeholder.jpg');
-    background-size: contain;
+    margin:auto;
+    /* margin-bottom: 20px; */
+    background-image: url('hero.png');
+    /* background-size: contain; */
     background-position: center;
     background-repeat: no-repeat;
-    opacity: 0.618;
+    /* opacity: .99; */
 }
 
 .empty-state h2 {
@@ -855,7 +988,7 @@ html, body {
 }
 
 .form-group input::placeholder {
-    color: var(--text-muted);
+    color: var(--code-bg);
 }
 
 .form-group .hint {
@@ -1366,6 +1499,7 @@ html, body {
     .message-input {
         padding: 12px 15px;
         font-size: 13px;
+        color:#28a745;
     }
     
     .send-btn {

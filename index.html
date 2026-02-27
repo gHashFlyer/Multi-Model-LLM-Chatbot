@@ -22,37 +22,34 @@
                 <!-- Conversations will be dynamically inserted here -->
             </div>
             <div class="sidebar-footer">
-                <button class="settings-btn" onclick="showApiKeysModal()">
-                    🔑 API Keys Settings
-                </button>
-                <div class="theme-toggle" onclick="toggleTheme()">
-                    <div class="toggle-switch"></div>
-                    <span class="theme-toggle-label">Dark Mode</span>
-                </div>
+                <!-- Moved API Keys and Theme Toggle to right sidebar -->
             </div>
         </aside>
 
         <!-- Main Chat Area -->
         <main class="chat-area">
             <header class="chat-header">
-                <div class="model-selector">
-                    <label for="modelSelect">Model:</label>
-                    <select id="modelSelect" onchange="handleModelChange()">
-                        <option value="" disabled selected>Loading models...</option>
-                    </select>
+                <div class="header-left">
+                    <div class="current-model-display">
+                        <span class="model-label">Model:</span>
+                        <span class="model-name" id="currentModelName">None</span>
+                    </div>
                 </div>
-                <div class="system-prompt-selector">
-                    <label for="systemPromptSelect">System Prompt:</label>
-                    <select id="systemPromptSelect" onchange="handleSystemPromptChange()">
-                        <!-- Options will be dynamically populated -->
-                    </select>
-                    <button class="edit-prompts-btn" onclick="showSystemPromptsModal()">✏️ Edit</button>
+                <div class="header-center">
+                    <div class="clock-display">
+                        <span id="localTime">00:00:00</span>
+                        <span class="utc-time" id="utcTime">UTC: 00:00:00</span>
+                    </div>
                 </div>
-                <div class="cost-display">
-                    <span class="cost-label">Session Cost:</span>
-                    <span class="cost-value" id="costDisplay">$0.0000</span>
+                <div class="header-right">
+                    <div class="cost-display">
+                        <span class="cost-label">Session Cost:</span>
+                        <span class="cost-value" id="costDisplay">$0.0000</span>
+                        <span class="cost-label" style="margin-left: 10px;">Tokens:</span>
+                        <span class="cost-value" id="tokensDisplay">0</span>
+                    </div>
+                    <button class="toggle-right-sidebar-btn" onclick="toggleRightSidebar()" title="Toggle Settings">⚙️</button>
                 </div>
-                <button class="tech-note-btn" onclick="showTechNotesModal()">⚙️ Technical Notes</button>
             </header>
 
             <div class="messages-container" id="messagesContainer">
@@ -73,6 +70,45 @@
                 </div>
             </div>
         </main>
+
+        <!-- Right Sidebar (Settings & Info) -->
+        <aside class="right-sidebar" id="rightSidebar">
+            <div class="sidebar-section">
+                <h3>Settings</h3>
+                <button class="settings-btn" onclick="showApiKeysModal()">
+                    🔑 API Keys Settings
+                </button>
+                <div class="theme-toggle" onclick="toggleTheme()">
+                    <div class="toggle-switch"></div>
+                    <span class="theme-toggle-label">Dark Mode</span>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Model Settings</h3>
+                <div class="model-selector">
+                    <label for="modelSelect">Model:</label>
+                    <select id="modelSelect" onchange="handleModelChange()">
+                        <option value="" disabled selected>Loading models...</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>System Prompt</h3>
+                <div class="system-prompt-selector">
+                    <select id="systemPromptSelect" onchange="handleSystemPromptChange()">
+                        <!-- Options will be dynamically populated -->
+                    </select>
+                    <button class="edit-prompts-btn" onclick="showSystemPromptsModal()">✏️ Edit</button>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Information</h3>
+                <button class="tech-note-btn" onclick="showTechNotesModal()">⚙️ Technical Notes</button>
+            </div>
+        </aside>
     </div>
 
     <!-- Technical Notes Modal -->

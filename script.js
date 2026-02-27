@@ -192,6 +192,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     initTheme();
     await initModelSelector();
     
+    // Start clock
+    startClock();
+    
+    // Update model display
+    updateCurrentModelDisplay();
+    
     if (state.conversations.length === 0) {
         createNewConversation();
     } else if (state.currentConversationId) {
@@ -223,7 +229,75 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (confirmDeleteBtn) {
         confirmDeleteBtn.addEventListener('click', confirmDeleteConversation);
     }
+
+    // Close right sidebar when clicking outside
+    document.addEventListener('click', (e) => {
+        const rightSidebar = document.getElementById('rightSidebar');
+        const toggleBtn = document.querySelector('.toggle-right-sidebar-btn');
+        const modelSelect = document.getElementById('modelSelect');
+        
+        if (rightSidebar && rightSidebar.classList.contains('active')) {
+            // Don't close if clicking inside sidebar or on the toggle button
+            if (!rightSidebar.contains(e.target) && !toggleBtn.contains(e.target)) {
+                // Only close if a model is selected (per requirement 3)
+                if (modelSelect && modelSelect.value) {
+                    rightSidebar.classList.remove('active');
+                }
+            }
+        }
+    });
 });
+
+// ============================================
+// CLOCK FUNCTIONS
+// ============================================
+function startClock() {
+    updateClock();
+    setInterval(updateClock, 1000);
+}
+
+function updateClock() {
+    const now = new Date();
+    
+    // Local time
+    const localTimeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    document.getElementById('localTime').textContent = localTimeStr;
+    
+    // UTC time
+    const utcTimeStr = now.getUTCHours().toString().padStart(2, '0') + ':' + 
+                       now.getUTCMinutes().toString().padStart(2, '0') + ':' + 
+                       now.getUTCSeconds().toString().padStart(2, '0');
+    document.getElementById('utcTime').textContent = `UTC: ${utcTimeStr}`;
+}
+
+// ============================================
+// SIDEBAR FUNCTIONS
+// ============================================
+function toggleRightSidebar() {
+    const sidebar = document.getElementById('rightSidebar');
+    if (sidebar) {
+        sidebar.classList.toggle('active');
+    }
+}
+
+function updateCurrentModelDisplay() {
+    const modelSelect = document.getElementById('modelSelect');
+    const display = document.getElementById('currentModelName');
+    if (modelSelect && display) {
+        const selectedOption = modelSelect.options[modelSelect.selectedIndex];
+        if (selectedOption && !selectedOption.disabled) {
+            display.textContent = selectedOption.text;
+            // If model is selected, we can hide sidebar if it was open (optional, but task says "indefinitely not hidden if a model is not selected")
+            // Interpretation: If no model is selected, sidebar MUST be shown.
+            if (!modelSelect.value) {
+                document.getElementById('rightSidebar').classList.add('active');
+            }
+        } else {
+            display.textContent = 'None';
+            document.getElementById('rightSidebar').classList.add('active');
+        }
+    }
+}
 
 // ============================================
 // LOCAL STORAGE FUNCTIONS
@@ -299,6 +373,7 @@ function loadConversation(conversationId) {
         renderConversationsList();
         renderMessages();
         updateCostDisplay();
+        updateCurrentModelDisplay();
     }
 }
 
@@ -379,6 +454,7 @@ function handleModelChange() {
         conversation.model = document.getElementById('modelSelect').value;
         saveToLocalStorage();
     }
+    updateCurrentModelDisplay();
 }
 
 function enableTitleEdit(conversationId, event) {
@@ -760,7 +836,9 @@ function scrollToLastAssistantMessage() {
 function updateCostDisplay() {
     const conversation = getCurrentConversation();
     const cost = conversation ? conversation.totalCost : 0;
+    const tokens = conversation ? (conversation.totalInputTokens + conversation.totalOutputTokens) : 0;
     document.getElementById('costDisplay').textContent = `$${cost.toFixed(4)}`;
+    document.getElementById('tokensDisplay').textContent = formatTokenCount(tokens);
 }
 
 function formatTokenCount(count) {
@@ -1213,7 +1291,8 @@ function renderModelSelector(catalog, selectedModelId) {
         optionsHtml += `<optgroup label="${PROVIDER_LABELS[provider]}">`;
         optionsHtml += models.map(model => {
             const label = escapeHtml(model.label || getModelDisplayName(model.id));
-            return `<option value="${model.id}">${label}</option>`;
+            const selected = model.id === selectedModelId ? 'selected' : '';
+            return `<option value="${model.id}" ${selected}>${label}</option>`;
         }).join('');
         optionsHtml += '</optgroup>';
     });
@@ -1237,6 +1316,8 @@ function renderModelSelector(catalog, selectedModelId) {
         conversation.model = select.value;
         saveToLocalStorage();
     }
+    
+    updateCurrentModelDisplay();
 }
 
 function normalizeModelCatalog(catalog) {
