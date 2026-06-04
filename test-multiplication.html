@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Multiplication Formatting</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .code-block {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre;
+        }
+        em {
+            font-style: italic;
+            color: blue;
+        }
+    </style>
+</head>
+<body>
+    <h1>Multiplication Operator Test</h1>
+    
+    <div class="test-section">
+        <h2>Raw Input (what LLM returns):</h2>
+        <pre id="raw-input"></pre>
+    </div>
+    
+    <div class="test-section">
+        <h2>Formatted Output:</h2>
+        <div id="formatted-output"></div>
+    </div>
+
+    <script>
+        // Copy the necessary functions from script.js
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function cleanSyntaxMarkup(text) {
+            if (!text) return text;
+            let clean = text.replace(/<span\b[^>]*\bclass=["']syntax-[^"']+["'][^>]*>([\s\S]*?)<\/span>/gi, '$1');
+            clean = clean.replace(/<span\b[^>]*\bclass=["']syntax-[^"']+["'][^>]*>/gi, '');
+            clean = clean.replace(/class=["']syntax-[^"']+["']\s*>/g, '');
+            clean = clean.replace(/<\/span>/gi, '');
+            return clean;
+        }
+
+        function formatMessageContent(content) {
+            let formatted = cleanSyntaxMarkup(content);
+            formatted = formatted.replace(/<pre(?:[^>]*)><code(?:[^>]*)>([\s\S]*?)<\/code><\/pre>/g, '```\n$1\n```');
+            formatted = formatted.replace(/<code(?:[^>]*)>([\s\S]*?)<\/code>/g, '`$1`');
+
+            // Extract code blocks and inline code BEFORE applying bold/italic formatting
+            const codePlaceholders = [];
+            
+            // Extract code blocks first
+            formatted = formatted.replace(/```(\w+)?\s*([\s\S]*?)```/g, (match, lang, code) => {
+                const placeholder = `__CODE_BLOCK_${codePlaceholders.length}__`;
+                codePlaceholders.push({ type: 'block', lang: lang || 'text', code: code.trim() });
+                return placeholder;
+            });
+            
+            // Extract inline code
+            formatted = formatted.replace(/`([^`]+)`/g, (match, code) => {
+                const placeholder = `__CODE_INLINE_${codePlaceholders.length}__`;
+                codePlaceholders.push({ type: 'inline', code: code });
+                return placeholder;
+            });
+
+            const tablePlaceholders = [];
+            const tableRegex = /(\|[^\n]+\|[\r\n]+\|[\s\-:|]+\|[\r\n]+(?:\|[^\n]+\|[\r\n]+)*)/g;
+            formatted = formatted.replace(tableRegex, (match) => {
+                const placeholder = `__TABLE_PLACEHOLDER_${tablePlaceholders.length}__`;
+                tablePlaceholders.push(match);
+                return placeholder;
+            });
+            
+            formatted = escapeHtml(formatted);
+            
+            // Format bold text (must come before italic to avoid conflicts)
+            formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+            
+            // Format italic text - only match when NOT surrounded by other word characters or digits
+            formatted = formatted.replace(/(\s|^)\*(?!\*)([^*\n]+?)\*(?!\*)(\s|[.,;!?]|$)/g, '$1<em>$2</em>$3');
+            
+            // Restore code blocks and inline code with proper formatting
+            codePlaceholders.forEach((item, index) => {
+                if (item.type === 'block') {
+                    const html = `<div class="code-block">${escapeHtml(item.code)}</div>`;
+                    formatted = formatted.replace(`__CODE_BLOCK_${index}__`, html);
+                } else if (item.type === 'inline') {
+                    formatted = formatted.replace(`__CODE_INLINE_${index}__`, `<span class="inline-code">${item.code}</span>`);
+                }
+            });
+            
+            tablePlaceholders.forEach((tableHTML, index) => {
+                formatted = formatted.replace(`__TABLE_PLACEHOLDER_${index}__`, tableHTML);
+            });
+            
+            return formatted;
+        }
+
+        // Test data - the C# code with multiplication operators
+        const testInput = `Here's a C# method to calculate the Haversine distance:
+
+\`\`\`csharp
+public static double CalculateHaversineDistance(double lat1, double lon1, double lat2, double lon2)
+{
+    // Convert degrees to radians
+    double lat1Rad = DegreesToRadians(lat1);
+    double lat2Rad = DegreesToRadians(lat2);
+    double deltaLat = DegreesToRadians(lat2 - lat1);
+    double deltaLon = DegreesToRadians(lon2 - lon1);
+
+    // Haversine formula
+    double a = Math.Sin(deltaLat / 2) * Math.Sin(deltaLat / 2) +
+              Math.Cos(lat1Rad) * Math.Cos(lat2Rad) *
+              Math.Sin(deltaLon / 2) * Math.Sin(deltaLon / 2);
+    
+    double c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+    
+    // Calculate distance
+    double distance = EarthRadiusMeters * c;
+    
+    return distance;
+}
+\`\`\`
+
+This is *italic text* and this is **bold text**.`;
+
+        // Display raw input
+        document.getElementById('raw-input').textContent = testInput;
+
+        // Format and display output
+        const formattedOutput = formatMessageContent(testInput);
+        document.getElementById('formatted-output').innerHTML = formattedOutput;
+
+        // Log to console for debugging
+        console.log('Raw Input:', testInput);
+        console.log('Formatted Output:', formattedOutput);
+    </script>
+</body>
+</html>

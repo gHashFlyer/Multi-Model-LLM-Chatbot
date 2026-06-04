@@ -640,7 +640,24 @@ function formatMessageContent(content) {
     // 3. Handle existing <code> blocks (inline)
     formatted = formatted.replace(/<code(?:[^>]*)>([\s\S]*?)<\/code>/g, '`$1`');
 
-    // 4. Extract and process markdown tables BEFORE escaping HTML
+    // 4. Extract code blocks and inline code BEFORE applying bold/italic formatting
+    const codePlaceholders = [];
+    
+    // Extract code blocks first
+    formatted = formatted.replace(/```(\w+)?\s*([\s\S]*?)```/g, (match, lang, code) => {
+        const placeholder = `__CODE_BLOCK_${codePlaceholders.length}__`;
+        codePlaceholders.push({ type: 'block', lang: lang || 'text', code: code.trim() });
+        return placeholder;
+    });
+    
+    // Extract inline code
+    formatted = formatted.replace(/`([^`]+)`/g, (match, code) => {
+        const placeholder = `__CODE_INLINE_${codePlaceholders.length}__`;
+        codePlaceholders.push({ type: 'inline', code: code });
+        return placeholder;
+    });
+
+    // 5. Extract and process markdown tables BEFORE escaping HTML
     const tablePlaceholders = [];
     const tableRegex = /(\|[^\n]+\|[\r\n]+\|[\s\-:|]+\|[\r\n]+(?:\|[^\n]+\|[\r\n]+)*)/g;
     
@@ -651,29 +668,32 @@ function formatMessageContent(content) {
         return placeholder;
     });
     
-    // 5. Now escape HTML (this won't affect our placeholders)
+    // 6. Now escape HTML (this won't affect our placeholders)
     formatted = escapeHtml(formatted);
     
-    // 6. Format code blocks with syntax highlighting
-    formatted = formatted.replace(/```(\w+)?\s*([\s\S]*?)```/g, (match, lang, code) => {
-        const language = lang || 'text';
-        const highlighted = highlightSyntax(code.trim(), language);
-        const blockId = 'code_' + Math.random().toString(36).substr(2, 9);
-        return `<div class="code-block-header">
-            <span class="code-block-lang">${language}</span>
+    // 7. Format bold text (must come before italic to avoid conflicts)
+    formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    
+    // 8. Format italic text - only match when NOT surrounded by other word characters or digits
+    // This prevents matching multiplication operators in code like: number * number
+    // Use word boundary logic: asterisk must be preceded/followed by whitespace or punctuation
+    formatted = formatted.replace(/(\s|^)\*(?!\*)([^*\n]+?)\*(?!\*)(\s|[.,;!?]|$)/g, '$1<em>$2</em>$3');
+    
+    // 9. Restore code blocks and inline code with proper formatting
+    codePlaceholders.forEach((item, index) => {
+        if (item.type === 'block') {
+            const highlighted = highlightSyntax(item.code, item.lang);
+            const blockId = 'code_' + Math.random().toString(36).substr(2, 9);
+            const html = `<div class="code-block-header">
+            <span class="code-block-lang">${item.lang}</span>
             <button class="copy-code-btn" onclick="copyCode('${blockId}')">Copy</button>
         </div>
         <div class="code-block with-header" id="${blockId}">${highlighted}</div>`;
+            formatted = formatted.replace(`__CODE_BLOCK_${index}__`, html);
+        } else if (item.type === 'inline') {
+            formatted = formatted.replace(`__CODE_INLINE_${index}__`, `<span class="inline-code">${item.code}</span>`);
+        }
     });
-    
-    // 7. Format inline code
-    formatted = formatted.replace(/`([^`]+)`/g, '<span class="inline-code">$1</span>');
-    
-    // 8. Format bold text
-    formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-    
-    // 9. Format italic text
-    formatted = formatted.replace(/\*([^*]+)\*/g, '<em>$1</em>');
     
     // 10. Restore table HTML by replacing placeholders
     tablePlaceholders.forEach((tableHTML, index) => {
