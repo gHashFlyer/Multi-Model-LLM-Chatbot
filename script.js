@@ -605,10 +605,33 @@ function renderMessages() {
     scrollToBottom();
 }
 
+/**
+ * Strip all syntax-class HTML markup that some LLMs emit in their raw responses.
+ * Handles three forms:
+ *   A) Well-formed:  <span class="syntax-keyword">def</span>  →  def
+ *   B) Orphaned tag: <span class="syntax-keyword">           →  (removed)
+ *   C) Broken frag:  class="syntax-number">50               →  50
+ *      (LLM omits the opening <span, just emits the attribute fragment)
+ * Also strips any leftover </span> closing tags.
+ * Safe to call on raw LLM text — does not affect backtick code fences.
+ */
+function cleanSyntaxMarkup(text) {
+    if (!text) return text;
+    // A: complete spans: <span class="syntax-X">content</span>  →  content
+    let clean = text.replace(/<span\b[^>]*\bclass=["']syntax-[^"']+["'][^>]*>([\s\S]*?)<\/span>/gi, '$1');
+    // B: orphaned opening tags with no matching </span>
+    clean = clean.replace(/<span\b[^>]*\bclass=["']syntax-[^"']+["'][^>]*>/gi, '');
+    // C: bare attribute fragments that LLMs emit without the <span prefix
+    //    e.g.  class="syntax-string">"yourfile.csv"  →  "yourfile.csv"
+    clean = clean.replace(/class=["']syntax-[^"']+["']\s*>/g, '');
+    // D: any leftover </span> closing tags
+    clean = clean.replace(/<\/span>/gi, '');
+    return clean;
+}
+
 function formatMessageContent(content) {
-    // 1. Strip existing syntax highlighting spans (if any)
-    // This handles the "Nor should the user see the classes for syntax highlighting" part
-    let formatted = content.replace(/<span class="syntax-[^"]+">([\s\S]*?)<\/span>/g, '$1');
+    // 1. Strip existing syntax highlighting spans/fragments from LLM responses
+    let formatted = cleanSyntaxMarkup(content);
     
     // 2. Handle existing <pre><code> blocks
     // We'll convert them to markdown fences temporarily so they are handled by the existing logic
@@ -661,9 +684,21 @@ function formatMessageContent(content) {
 }
 
 function highlightSyntax(code, language) {
-    // Simple regex-based syntax highlighting
-    let highlighted = code;
-    
+    // Multi-pass syntax highlighting using placeholders to prevent later passes
+    // from corrupting HTML tags inserted by earlier passes.
+    // Each completed span is stashed in `spans[]` and replaced with a unique
+    // token __SYN_0__, __SYN_1__, … that cannot be matched by subsequent regexes.
+    // At the end all tokens are restored in reverse order.
+
+    const spans = [];
+    const stash = (html) => {
+        const token = `\x00SYN${spans.length}\x00`;
+        spans.push(html);
+        return token;
+    };
+
+    let h = code;
+
     // Keywords for common languages
     const keywords = [
         'function', 'const', 'let', 'var', 'if', 'else', 'for', 'while', 'return',
@@ -674,32 +709,38 @@ function highlightSyntax(code, language) {
         'break', 'continue', 'elif', 'except', 'finally', 'raise', 'yield', 'in',
         'not', 'and', 'or', 'is', 'assert', 'global', 'nonlocal', 'del'
     ];
-    
-    // Highlight strings (single and double quotes)
-    highlighted = highlighted.replace(/(["'])((?:\\.|(?!\1)[^\\])*?)\1/g, 
-        '<span class="syntax-string">$1$2$1</span>');
-    
-    // Highlight comments
-    highlighted = highlighted.replace(/(\/\/.*$|#.*$)/gm, 
-        '<span class="syntax-comment">$1</span>');
-    highlighted = highlighted.replace(/(\/\*[\s\S]*?\*\/)/g, 
-        '<span class="syntax-comment">$1</span>');
-    
-    // Highlight numbers
-    highlighted = highlighted.replace(/\b(\d+\.?\d*)\b/g, 
-        '<span class="syntax-number">$1</span>');
-    
-    // Highlight keywords
+
+    // 1. Highlight strings (single and double quotes) — stash immediately
+    h = h.replace(/(["'])((?:\\.|(?!\1)[^\\])*?)\1/g, (m) =>
+        stash(`<span class="syntax-string">${m}</span>`));
+
+    // 2. Highlight comments — stash immediately
+    h = h.replace(/(\/\/.*$|#.*$)/gm, (m) =>
+        stash(`<span class="syntax-comment">${m}</span>`));
+    h = h.replace(/(\/\*[\s\S]*?\*\/)/g, (m) =>
+        stash(`<span class="syntax-comment">${m}</span>`));
+
+    // 3. Highlight numbers — stash immediately
+    h = h.replace(/\b(\d+\.?\d*)\b/g, (m) =>
+        stash(`<span class="syntax-number">${m}</span>`));
+
+    // 4. Highlight keywords — only plain text remains (stashed spans are opaque tokens)
     keywords.forEach(keyword => {
         const regex = new RegExp(`\\b(${keyword})\\b`, 'g');
-        highlighted = highlighted.replace(regex, '<span class="syntax-keyword">$1</span>');
+        h = h.replace(regex, (m) => stash(`<span class="syntax-keyword">${m}</span>`));
     });
-    
-    // Highlight function calls
-    highlighted = highlighted.replace(/\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g, 
-        '<span class="syntax-function">$1</span>(');
-    
-    return highlighted;
+
+    // 5. Highlight function calls
+    h = h.replace(/\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g, (m, name) =>
+        stash(`<span class="syntax-function">${name}</span>`) + '(');
+
+    // Restore all stashed spans (simple string replacement, order doesn't matter
+    // because tokens are unique null-byte-delimited strings)
+    spans.forEach((html, i) => {
+        h = h.replace(`\x00SYN${i}\x00`, html);
+    });
+
+    return h;
 }
 
 /**
@@ -1780,10 +1821,11 @@ async function sendMessage() {
                 throw new Error('Unknown provider');
         }
         
-        // Add assistant message
+        // Add assistant message — clean any raw syntax-class markup from the LLM response
+        // before storing so the data in localStorage is already sanitised.
         conversation.messages.push({
             role: 'assistant',
-            content: response.content,
+            content: cleanSyntaxMarkup(response.content),
             model: conversation.model,
             systemPromptId: state.currentSystemPromptId
         });
