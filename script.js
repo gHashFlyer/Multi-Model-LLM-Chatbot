@@ -560,8 +560,6 @@ function renderMessages() {
     if (!conversation || conversation.messages.length === 0) {
         container.innerHTML = `
             <div class="empty-state">
-                <div class="empty-state-icon"></div>
-
             </div>
         `;
         return;
